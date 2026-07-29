@@ -259,8 +259,164 @@ enum TestRunner {
         }
     }
 
+    private static func withAudioBufferList(_ buffers: [AudioBuffer], _ body: (UnsafeMutablePointer<AudioBufferList>) -> Void) {
+        let offset = MemoryLayout<AudioBufferList>.offset(of: \.mBuffers)!
+        let storage = UnsafeMutableRawPointer.allocate(byteCount: offset + buffers.count * MemoryLayout<AudioBuffer>.size,
+                                                        alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { storage.deallocate() }
+        let list = storage.assumingMemoryBound(to: AudioBufferList.self)
+        list.pointee.mNumberBuffers = UInt32(buffers.count)
+        let destination = storage.advanced(by: offset).assumingMemoryBound(to: AudioBuffer.self)
+        destination.initialize(from: buffers, count: buffers.count)
+        body(list)
+    }
+
     private static func engineRenderTests() {
         let frames = 512, channels = 2
+
+        let stereo = AudioStreamBasicDescription(mSampleRate: 48_000, mFormatID: kAudioFormatLinearPCM,
+                                                  mFormatFlags: kAudioFormatFlagIsFloat, mBytesPerPacket: 8,
+                                                  mFramesPerPacket: 1, mBytesPerFrame: 8, mChannelsPerFrame: 2,
+                                                  mBitsPerChannel: 32, mReserved: 0)
+        var physical = stereo
+        physical.mChannelsPerFrame = 4
+        physical.mBytesPerPacket = 16
+        physical.mBytesPerFrame = 16
+        var mono = stereo
+        mono.mChannelsPerFrame = 1
+        mono.mBytesPerPacket = 4
+        mono.mBytesPerFrame = 4
+        var nonInterleaved = stereo
+        nonInterleaved.mFormatFlags |= kAudioFormatFlagIsNonInterleaved
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [physical, stereo], aggregateInputChannels: [4, 2]) == TapInputSelection(bufferIndex: 1, channels: 2), "tap selection finds trailing stereo stream")
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [stereo, physical], aggregateInputChannels: [2, 4]) == TapInputSelection(bufferIndex: 0, channels: 2), "tap selection follows queried stream order")
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [stereo], aggregateInputChannels: [2]) == TapInputSelection(bufferIndex: 0, channels: 2), "tap selection supports built-in stereo")
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [physical, mono, mono], aggregateInputChannels: [4, 1, 1]) == nil, "tap selection rejects adjacent mono candidates")
+        expect(TapInputSelection.select(tapFormat: nonInterleaved, aggregateInputFormats: [nonInterleaved], aggregateInputChannels: [2]) == nil, "tap selection rejects non-interleaved tap format")
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [physical], aggregateInputChannels: [4]) == nil, "tap selection rejects missing stereo stream")
+        expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [stereo, stereo], aggregateInputChannels: [2, 2]) == nil, "tap selection rejects ambiguous stereo streams")
+
+        let reversedEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 0, channels: 2))
+        var reversedTapInput = (0..<frames).flatMap { _ in [Float(0.125), Float(-0.25)] }
+        var reversedPhysicalInput = [Float](repeating: 77, count: frames * 4)
+        var reversedOutput = [Float](repeating: 0, count: frames * 4)
+        reversedTapInput.withUnsafeMutableBufferPointer { tapBuffer in
+            reversedPhysicalInput.withUnsafeMutableBufferPointer { physicalBuffer in
+                reversedOutput.withUnsafeMutableBufferPointer { outputBuffer in
+                    withAudioBufferList([
+                        AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(tapBuffer.count * MemoryLayout<Float>.size), mData: tapBuffer.baseAddress),
+                        AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(physicalBuffer.count * MemoryLayout<Float>.size), mData: physicalBuffer.baseAddress),
+                    ]) { input in
+                        withAudioBufferList([
+                            AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                        ]) { output in
+                            reversedEngine.render(input: input, output: output)
+                        }
+                    }
+                }
+            }
+        }
+        expect((0..<frames).allSatisfy { frame in
+            let base = frame * 4
+            return reversedOutput[base] == 0.125 && reversedOutput[base + 1] == -0.25
+                && reversedOutput[base + 2] == 0.125 && reversedOutput[base + 3] == -0.25
+        }, "render consumes selected tap at index 0 before physical stream")
+        expect(!reversedOutput.contains(77), "reversed render never outputs physical sentinel")
+
+        let routingEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 1, channels: 2))
+        var physicalInput = [Float](repeating: 99, count: frames * 4)
+        var tapInput = (0..<frames).flatMap { _ in [Float(0.25), Float(-0.5)] }
+        var fourChannelOutput = [Float](repeating: 0, count: frames * 4)
+        physicalInput.withUnsafeMutableBufferPointer { physicalBuffer in
+            tapInput.withUnsafeMutableBufferPointer { tapBuffer in
+                fourChannelOutput.withUnsafeMutableBufferPointer { outputBuffer in
+                    withAudioBufferList([
+                        AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(physicalBuffer.count * MemoryLayout<Float>.size), mData: physicalBuffer.baseAddress),
+                        AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(tapBuffer.count * MemoryLayout<Float>.size), mData: tapBuffer.baseAddress),
+                    ]) { input in
+                        withAudioBufferList([
+                            AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                        ]) { output in
+                            routingEngine.render(input: input, output: output)
+                        }
+                    }
+                }
+            }
+        }
+        expect((0..<frames).allSatisfy { frame in
+            let base = frame * 4
+            return fourChannelOutput[base] == 0.25 && fourChannelOutput[base + 1] == -0.5
+                && fourChannelOutput[base + 2] == 0.25 && fourChannelOutput[base + 3] == -0.5
+        }, "render routes only selected tap stereo as L/R/L/R")
+        expect(!fourChannelOutput.contains(99), "iD4 render never outputs physical sentinel")
+
+        var disabledOutput = [Float](repeating: 0, count: frames * 4)
+        tapInput.withUnsafeMutableBufferPointer { tapBuffer in
+            disabledOutput.withUnsafeMutableBufferPointer { outputBuffer in
+                withAudioBufferList([
+                    AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(frames * 4 * MemoryLayout<Float>.size), mData: nil),
+                    AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(tapBuffer.count * MemoryLayout<Float>.size), mData: tapBuffer.baseAddress),
+                ]) { input in
+                    withAudioBufferList([
+                        AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                    ]) { output in
+                        routingEngine.render(input: input, output: output)
+                    }
+                }
+            }
+        }
+        expect(disabledOutput == fourChannelOutput, "disabled physical input with null data does not affect selected tap")
+
+        let mismatchEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 1, channels: 2))
+        var mismatchOutput = [Float](repeating: 1, count: frames * 4)
+        tapInput.withUnsafeMutableBufferPointer { tapBuffer in
+            mismatchOutput.withUnsafeMutableBufferPointer { outputBuffer in
+                withAudioBufferList([
+                    AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(frames * 4 * MemoryLayout<Float>.size), mData: nil),
+                    AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(tapBuffer.count * MemoryLayout<Float>.size / 2), mData: tapBuffer.baseAddress),
+                ]) { input in
+                    withAudioBufferList([
+                        AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                    ]) { output in
+                        mismatchEngine.render(input: input, output: output)
+                    }
+                }
+            }
+        }
+        expect(mismatchOutput.allSatisfy { $0 == 0 }, "selected-buffer shape mismatch zeros output")
+
+        let nullEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 1, channels: 2))
+        var nullOutput = [Float](repeating: 1, count: frames * 2)
+        nullOutput.withUnsafeMutableBufferPointer { outputBuffer in
+            withAudioBufferList([
+                AudioBuffer(mNumberChannels: 4, mDataByteSize: UInt32(frames * 4 * MemoryLayout<Float>.size), mData: nil),
+                AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(frames * 2 * MemoryLayout<Float>.size), mData: nil),
+            ]) { input in
+                withAudioBufferList([
+                    AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                ]) { output in
+                    nullEngine.render(input: input, output: output)
+                }
+            }
+        }
+        expect(nullOutput.allSatisfy { $0 == 0 }, "null selected tap buffer zeros output")
+
+        let missingEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 2, channels: 2))
+        var missingOutput = [Float](repeating: 1, count: frames * 2)
+        tapInput.withUnsafeMutableBufferPointer { tapBuffer in
+            missingOutput.withUnsafeMutableBufferPointer { outputBuffer in
+                withAudioBufferList([
+                    AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(tapBuffer.count * MemoryLayout<Float>.size), mData: tapBuffer.baseAddress),
+                ]) { input in
+                    withAudioBufferList([
+                        AudioBuffer(mNumberChannels: 2, mDataByteSize: UInt32(outputBuffer.count * MemoryLayout<Float>.size), mData: outputBuffer.baseAddress),
+                    ]) { output in
+                        missingEngine.render(input: input, output: output)
+                    }
+                }
+            }
+        }
+        expect(missingOutput.allSatisfy { $0 == 0 }, "missing selected tap buffer zeros output")
 
         // Audio starting later in the buffer must still mark the tap as live.
         let lateEngine = ProcessTapEngine()
