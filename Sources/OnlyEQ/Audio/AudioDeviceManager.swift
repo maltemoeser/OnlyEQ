@@ -126,6 +126,42 @@ enum AudioDeviceManager {
         return value
     }
 
+    static func tapFormat(_ id: AudioObjectID) -> AudioStreamBasicDescription? {
+        var addr = address(kAudioTapPropertyFormat)
+        var value = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &value) == noErr else { return nil }
+        return value
+    }
+
+    static func inputStreamFormats(_ id: AudioObjectID) -> [AudioStreamBasicDescription]? {
+        var streamAddress = address(kAudioDevicePropertyStreams, scope: kAudioDevicePropertyScopeInput)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &streamAddress, 0, nil, &size) == noErr else { return nil }
+        var streams = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(id, &streamAddress, 0, nil, &size, &streams) == noErr else { return nil }
+        var formats: [AudioStreamBasicDescription] = []
+        formats.reserveCapacity(streams.count)
+        for stream in streams {
+            var formatAddress = address(kAudioStreamPropertyVirtualFormat)
+            var format = AudioStreamBasicDescription()
+            var formatSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+            guard AudioObjectGetPropertyData(stream, &formatAddress, 0, nil, &formatSize, &format) == noErr else { return nil }
+            formats.append(format)
+        }
+        return formats
+    }
+
+    static func inputStreamChannelCounts(_ id: AudioObjectID) -> [UInt32]? {
+        var addr = address(kAudioDevicePropertyStreamConfiguration, scope: kAudioDevicePropertyScopeInput)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &addr, 0, nil, &size) == noErr, size > 0 else { return nil }
+        let storage = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { storage.deallocate() }
+        guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, storage) == noErr else { return nil }
+        return UnsafeMutableAudioBufferListPointer(storage.assumingMemoryBound(to: AudioBufferList.self)).map(\.mNumberChannels)
+    }
+
     // MARK: - Volume
 
     static func hardwareVolumeAddresses(_ id: AudioObjectID) -> [AudioObjectPropertyAddress] {

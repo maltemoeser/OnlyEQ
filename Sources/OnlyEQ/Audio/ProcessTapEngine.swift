@@ -3,6 +3,41 @@ import CoreAudio
 import AudioToolbox
 import Accelerate
 
+struct TapInputSelection: Equatable {
+    let bufferIndex: Int
+    let channels: Int
+
+    init(bufferIndex: Int, channels: Int) {
+        self.bufferIndex = bufferIndex
+        self.channels = channels
+    }
+
+    static func select(tapFormat: AudioStreamBasicDescription,
+                       aggregateInputFormats: [AudioStreamBasicDescription],
+                       aggregateInputChannels: [UInt32]) -> TapInputSelection? {
+        guard tapFormat.mFormatID == kAudioFormatLinearPCM,
+              tapFormat.mFormatFlags & kAudioFormatFlagIsFloat != 0,
+              tapFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0,
+              tapFormat.mBitsPerChannel == 32,
+              tapFormat.mChannelsPerFrame == 2,
+              aggregateInputFormats.count == aggregateInputChannels.count else { return nil }
+        var matches: [TapInputSelection] = []
+        for (index, format) in aggregateInputFormats.enumerated()
+            where aggregateInputChannels[index] == 2 && compatible(format, tapFormat) {
+            matches.append(TapInputSelection(bufferIndex: index, channels: 2))
+        }
+        guard matches.count == 1 else { return nil }
+        return matches[0]
+    }
+
+    private static func compatible(_ lhs: AudioStreamBasicDescription, _ rhs: AudioStreamBasicDescription) -> Bool {
+        lhs.mSampleRate == rhs.mSampleRate && lhs.mFormatID == rhs.mFormatID && lhs.mFormatFlags == rhs.mFormatFlags
+            && lhs.mBytesPerPacket == rhs.mBytesPerPacket && lhs.mFramesPerPacket == rhs.mFramesPerPacket
+            && lhs.mBytesPerFrame == rhs.mBytesPerFrame && lhs.mChannelsPerFrame == rhs.mChannelsPerFrame
+            && lhs.mBitsPerChannel == rhs.mBitsPerChannel
+    }
+}
+
 /// System-wide EQ engine built on Core Audio process taps (macOS 14.4+).
 ///
 /// Signal path: muted global tap (silences original output) → aggregate device
@@ -46,6 +81,7 @@ final class ProcessTapEngine {
     /// Consecutive all-zero input frames, saturated at one second's worth.
     private var silentFrames = 0
     private var isSilenceGated = false
+    private var preparedInput: TapInputSelection
 
     var onStateChange: ((State) -> Void)?
 
@@ -54,10 +90,12 @@ final class ProcessTapEngine {
     /// the owner must restart the engine to stay on pitch.
     var onSampleRateChange: (() -> Void)?
 
-    init() {
+    init(preparedInput: TapInputSelection = TapInputSelection(bufferIndex: 0, channels: 2)) {
+        self.preparedInput = preparedInput
         inputChannels.reserveCapacity(8)
         activeChannels.reserveCapacity(8)
         channelScratch.reserveCapacity(8)
+        prepareScratch(channels: preparedInput.channels, frames: ioBufferFrames)
     }
 
     // MARK: - Lifecycle
@@ -133,6 +171,21 @@ final class ProcessTapEngine {
         }
         aggregateID = newAggregateID
 
+        // AudioHardware process taps do not prove provenance by stream order:
+        // adjacent mono buffers could be physical input, so only one uniquely
+        // matched interleaved stereo tap stream is accepted.
+        guard let tapFormat = AudioDeviceManager.tapFormat(tapID),
+              let inputFormats = AudioDeviceManager.inputStreamFormats(aggregateID),
+              let inputChannels = AudioDeviceManager.inputStreamChannelCounts(aggregateID),
+              let selection = TapInputSelection.select(tapFormat: tapFormat,
+                                                        aggregateInputFormats: inputFormats,
+                                                        aggregateInputChannels: inputChannels) else {
+            cleanup()
+            transition(to: .failed("Unsupported aggregate input topology: no unique tap stream."))
+            return
+        }
+        preparedInput = selection
+
         // 3. IOProc: tapped audio arrives as input, processed audio leaves as output.
         hasReceivedAudio = false
         silentFrames = 0
@@ -164,11 +217,6 @@ final class ProcessTapEngine {
 
     func stop() {
         removeSampleRateListener()
-        if let ioProcID, aggregateID != 0 {
-            AudioDeviceStop(aggregateID, ioProcID)
-            AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
-        }
-        ioProcID = nil
         cleanup()
         if state != .stopped { transition(to: .stopped) }
     }
@@ -179,6 +227,11 @@ final class ProcessTapEngine {
     }
 
     private func cleanup() {
+        if let ioProcID, aggregateID != 0 {
+            AudioDeviceStop(aggregateID, ioProcID)
+            AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
+        }
+        ioProcID = nil
         if aggregateID != 0 {
             AudioHardwareDestroyAggregateDevice(aggregateID)
             aggregateID = 0
@@ -257,23 +310,31 @@ final class ProcessTapEngine {
     func render(input: UnsafePointer<AudioBufferList>, output: UnsafeMutablePointer<AudioBufferList>) {
         let inputList = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         let outputList = UnsafeMutableAudioBufferListPointer(output)
-        guard inputList.count > 0, outputList.count > 0 else { return }
-
-        // Gather input channel pointers (tap side). The tap delivers Float32;
-        // buffers may be interleaved-stereo-in-one or split per channel.
-        inputChannels.removeAll(keepingCapacity: true)
-        var frameCount = Int.max
-        for buffer in inputList {
-            guard let data = buffer.mData else { continue }
-            let channelCount = max(Int(buffer.mNumberChannels), 1)
-            let frames = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size / channelCount
-            let floatPtr = data.assumingMemoryBound(to: Float.self)
-            frameCount = min(frameCount, frames)
-            for ch in 0..<channelCount {
-                inputChannels.append(InputChannel(pointer: floatPtr + ch, stride: channelCount))
-            }
+        guard inputList.count > 0, outputList.count > 0 else {
+            zero(outputList)
+            return
         }
-        guard !inputChannels.isEmpty, frameCount != .max, frameCount > 0 else { return }
+        // Consume only the prepared tap stream; other aggregate inputs can be
+        // physical streams and must never influence output.
+        inputChannels.removeAll(keepingCapacity: true)
+        guard preparedInput.bufferIndex < inputList.count else { zero(outputList); return }
+        let selectedBuffer = inputList[preparedInput.bufferIndex]
+        let channels = preparedInput.channels
+        guard channels == 2, let data = selectedBuffer.mData, Int(selectedBuffer.mNumberChannels) == channels,
+              selectedBuffer.mDataByteSize % UInt32(MemoryLayout<Float>.size * channels) == 0 else { zero(outputList); return }
+        let frameCount = Int(selectedBuffer.mDataByteSize) / MemoryLayout<Float>.size / channels
+        guard frameCount > 0 else {
+            zero(outputList)
+            return
+        }
+        let floatPtr = data.assumingMemoryBound(to: Float.self)
+        for ch in 0..<channels {
+            inputChannels.append(InputChannel(pointer: floatPtr + ch, stride: channels))
+        }
+        guard inputChannels.count <= channelScratch.count, frameCount <= scratchCapacity else {
+            zero(outputList)
+            return
+        }
 
         // Inspect the exact frames/channels the renderer consumes. Scanning the
         // raw AudioBuffer storage as one contiguous vDSP vector is incorrect for
@@ -298,17 +359,12 @@ final class ProcessTapEngine {
                     processor.resetRenderState()
                     isSilenceGated = true
                 }
-                for buffer in outputList {
-                    guard let data = buffer.mData else { continue }
-                    vDSP_vclr(data.assumingMemoryBound(to: Float.self), 1,
-                              vDSP_Length(Int(buffer.mDataByteSize) / MemoryLayout<Float>.size))
-                }
+                zero(outputList)
                 return
             }
         }
 
         // De-interleave into scratch, process, then write to the output buffers.
-        prepareScratch(channels: inputChannels.count, frames: frameCount)
         activeChannels.removeAll(keepingCapacity: true)
         var zero: Float = 0
         for (index, channel) in inputChannels.enumerated() {
@@ -360,4 +416,12 @@ final class ProcessTapEngine {
     }
 
     private var scratchCapacity = 0
+
+    private func zero(_ outputList: UnsafeMutableAudioBufferListPointer) {
+        for buffer in outputList {
+            guard let data = buffer.mData else { continue }
+            vDSP_vclr(data.assumingMemoryBound(to: Float.self), 1,
+                      vDSP_Length(Int(buffer.mDataByteSize) / MemoryLayout<Float>.size))
+        }
+    }
 }
