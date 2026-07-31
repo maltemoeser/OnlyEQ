@@ -25,7 +25,7 @@ if [ ! -x "$GENERATE_APPCAST" ] || [ ! -x "$GENERATE_KEYS" ]; then
 fi
 
 # Fail before the expensive build if the signing key is unavailable.
-"$GENERATE_KEYS" --account zollans.OnlyEQ -p >/dev/null
+"$GENERATE_KEYS" --account zollans.OnlyEQ.v2 -p >/dev/null
 ./scripts/build-app.sh release
 
 ARCHIVE="build/OnlyEQ.app.zip"
@@ -39,7 +39,7 @@ cp "$ARCHIVE" "$APPCAST_WORK/OnlyEQ.app.zip"
 cp "$NOTES" "$APPCAST_WORK/OnlyEQ.app.md"
 
 "$GENERATE_APPCAST" \
-    --account zollans.OnlyEQ \
+    --account zollans.OnlyEQ.v2 \
     --download-url-prefix "https://github.com/zollans/OnlyEQ/releases/download/v$VERSION/" \
     --link "https://github.com/zollans/OnlyEQ" \
     --embed-release-notes \
@@ -47,8 +47,8 @@ cp "$NOTES" "$APPCAST_WORK/OnlyEQ.app.md"
     --maximum-deltas 0 \
     "$APPCAST_WORK"
 
-cp "$APPCAST_WORK/appcast.xml" appcast.xml
+cp "$APPCAST_WORK/appcast-v2.xml" appcast-v2.xml
 
 echo "Prepared OnlyEQ $VERSION"
 echo "  Release archive: $ARCHIVE"
-echo "  Signed appcast: appcast.xml"
+echo "  Signed appcast: appcast-v2.xml"

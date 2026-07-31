@@ -23,7 +23,7 @@ git clone https://github.com/zollans/OnlyEQ && cd OnlyEQ
 
 Requires macOS 14.4 or newer. On first launch it asks for System Audio Recording permission — that's the tap. macOS shows the purple recording indicator while EQ is active; audio never leaves your machine.
 
-Starting with 1.1.0, OnlyEQ checks for signed updates automatically and installs them in the background. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately. Versions 1.0.x need one final manual install of 1.1.0 before automatic updates are available.
+OnlyEQ checks for signed updates automatically and installs them in the background. Because the update-signing key changed, versions through 1.2.3 require one manual installation of 1.2.4. Automatic updates resume normally after 1.2.4 is installed. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately.
 
 ## What it does
 
@@ -63,7 +63,7 @@ swift run OnlyEQ --profile-suggestion-probe # previews Bluetooth profile discove
 swift run OnlyEQ --menu-panel-probe    # previews the arrowless menu panel
 swift run OnlyEQ --screenshots out/   # renders the README screenshots
 ./scripts/build-app.sh release        # universal binary release build
-./scripts/prepare-release.sh 1.2.2    # signed archive + appcast
+./scripts/prepare-release.sh 1.2.4    # signed archive + v2 appcast
 ```
 
 Tests run inside the binary because the Command Line Tools don't ship XCTest. Diagnostics land in `~/Library/Logs/OnlyEQ.log`.
