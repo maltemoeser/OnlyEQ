@@ -23,7 +23,9 @@ git clone https://github.com/zollans/OnlyEQ && cd OnlyEQ
 
 Requires macOS 14.4 or newer. On first launch it asks for System Audio Recording permission — that's the tap. macOS shows the purple recording indicator while EQ is active; audio never leaves your machine.
 
-OnlyEQ checks for signed updates automatically and installs them in the background. Because the update-signing key changed, versions through 1.2.3 require one manual installation of 1.2.4. Automatic updates resume normally after 1.2.4 is installed. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately.
+OnlyEQ checks for signed updates automatically and installs them in the background. The original Mac that held the Sparkle private key became unavailable before the key was backed up. Versions through 1.2.3 trust that old key, and OnlyEQ is ad-hoc signed rather than Developer ID signed, so Sparkle cannot securely rotate to a replacement key through an automatic update.
+
+Version 1.2.4 therefore starts a new signing chain with a backed-up key and a separate `appcast-v2.xml` feed. Keeping the feeds separate prevents older clients from being offered an archive they cannot verify. Versions through 1.2.3 need one manual installation of 1.2.4; automatic updates resume normally afterward. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately.
 
 ## What it does
 
