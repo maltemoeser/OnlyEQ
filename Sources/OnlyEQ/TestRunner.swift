@@ -489,28 +489,46 @@ enum TestRunner {
         )
 
         expect(
-            AppState.routeNeedsRebuild(
-                isEnabled: true, engineTargetID: 41, defaultDeviceID: 52, defaultDeviceIsReady: true
-            ),
+            AppState.topologyAction(
+                isEnabled: true, engineIsRunning: true,
+                engineTargetID: 41, defaultDeviceID: 52, defaultDeviceIsReady: true
+            ) == .rebuild,
             "route rebuild follows engine target after UI device refresh"
         )
         expect(
-            !AppState.routeNeedsRebuild(
-                isEnabled: true, engineTargetID: 52, defaultDeviceID: 52, defaultDeviceIsReady: true
-            ),
+            AppState.topologyAction(
+                isEnabled: true, engineIsRunning: true,
+                engineTargetID: 52, defaultDeviceID: 52, defaultDeviceIsReady: true
+            ) == .none,
             "route rebuild skips matching engine target"
         )
         expect(
-            !AppState.routeNeedsRebuild(
-                isEnabled: false, engineTargetID: 41, defaultDeviceID: 52, defaultDeviceIsReady: true
-            ),
+            AppState.topologyAction(
+                isEnabled: false, engineIsRunning: true,
+                engineTargetID: 41, defaultDeviceID: 52, defaultDeviceIsReady: true
+            ) == .none,
             "disabled engine ignores route changes"
         )
         expect(
-            !AppState.routeNeedsRebuild(
-                isEnabled: true, engineTargetID: 41, defaultDeviceID: 52, defaultDeviceIsReady: false
-            ),
-            "route rebuild waits for transient device topology to settle"
+            AppState.topologyAction(
+                isEnabled: true, engineIsRunning: true,
+                engineTargetID: 41, defaultDeviceID: nil, defaultDeviceIsReady: false
+            ) == .stop,
+            "missing output tears down the muted tap"
+        )
+        expect(
+            AppState.topologyAction(
+                isEnabled: true, engineIsRunning: false,
+                engineTargetID: 0, defaultDeviceID: nil, defaultDeviceIsReady: false
+            ) == .none,
+            "missing output leaves an already stopped engine alone"
+        )
+        expect(
+            AppState.topologyAction(
+                isEnabled: true, engineIsRunning: false,
+                engineTargetID: 0, defaultDeviceID: 52, defaultDeviceIsReady: true
+            ) == .rebuild,
+            "restored output restarts a fail-safe stopped engine"
         )
 
         MainActor.assumeIsolated {

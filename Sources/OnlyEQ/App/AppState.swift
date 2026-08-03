@@ -349,18 +349,26 @@ final class AppState: ObservableObject {
         refreshDevices()
         let defaultDeviceID = AudioDeviceManager.defaultOutputDeviceID()
 
-        // `currentDevice` is UI state and may already have been refreshed by a
-        // device-list notification. Compare against the engine's actual route;
-        // otherwise the later default-device notification can look unchanged
-        // while audio is still attached to the disconnected output.
-        if Self.routeNeedsRebuild(
+        // A process tap with `.mutedWhenTapped` silences the original system
+        // mix. If Core Audio temporarily publishes no usable default output,
+        // keeping that tap alive can strand every app behind a route that no
+        // longer exists (web video may stall as well as going silent). Tear it
+        // down immediately, then rebuild when a complete topology returns.
+        switch Self.topologyAction(
             isEnabled: isEnabled,
+            engineIsRunning: engine.state == .running,
             engineTargetID: engine.targetDeviceID,
             defaultDeviceID: defaultDeviceID,
             defaultDeviceIsReady: currentDevice != nil
         ) {
+        case .stop:
+            Log.write("device: output unavailable; stopping muted tap")
+            engine.stop()
+        case .rebuild:
             Log.write("device: rebuilding route \(engine.targetDeviceID) -> \(defaultDeviceID ?? 0) (\(currentDevice?.name ?? "unavailable"))")
             rebuildEngine()
+        case .none:
+            break
         }
 
         if let currentDevice, previousUID != currentDevice.uid {
@@ -370,13 +378,24 @@ final class AppState: ObservableObject {
         }
     }
 
-    nonisolated static func routeNeedsRebuild(
+    enum AudioTopologyAction: Equatable {
+        case none
+        case stop
+        case rebuild
+    }
+
+    nonisolated static func topologyAction(
         isEnabled: Bool,
+        engineIsRunning: Bool,
         engineTargetID: AudioObjectID,
         defaultDeviceID: AudioObjectID?,
         defaultDeviceIsReady: Bool
-    ) -> Bool {
-        isEnabled && defaultDeviceIsReady && defaultDeviceID != engineTargetID
+    ) -> AudioTopologyAction {
+        guard isEnabled else { return .none }
+        guard let defaultDeviceID, defaultDeviceIsReady else {
+            return engineIsRunning ? .stop : .none
+        }
+        return !engineIsRunning || defaultDeviceID != engineTargetID ? .rebuild : .none
     }
 
     private func suggestProfileForCurrentDeviceIfNeeded() {

@@ -104,6 +104,11 @@ final class ProcessTapEngine {
     /// current system default output.
     func start(outputDeviceID explicitDevice: AudioObjectID? = nil, excludedBundleIDs: Set<String> = []) {
         stop()
+        // A previous engine instance may have received audio even when this
+        // start attempt cannot resolve an output device. Reset probe state up
+        // front so failed restarts never masquerade as a live audio path.
+        hasReceivedAudio = false
+        targetDeviceID = 0
 
         guard let deviceID = explicitDevice ?? AudioDeviceManager.defaultOutputDeviceID(),
               let deviceUID = AudioDeviceManager.stringProperty(deviceID, kAudioDevicePropertyDeviceUID) else {
@@ -187,7 +192,6 @@ final class ProcessTapEngine {
         preparedInput = selection
 
         // 3. IOProc: tapped audio arrives as input, processed audio leaves as output.
-        hasReceivedAudio = false
         silentFrames = 0
         isSilenceGated = false
         status = AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateID, nil) { [weak self] _, inInputData, _, outOutputData, _ in
@@ -218,6 +222,8 @@ final class ProcessTapEngine {
     func stop() {
         removeSampleRateListener()
         cleanup()
+        targetDeviceID = 0
+        hasReceivedAudio = false
         if state != .stopped { transition(to: .stopped) }
     }
 
