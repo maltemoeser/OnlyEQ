@@ -15,10 +15,10 @@ For each release:
 Example publishing command after the release commit is on `main`:
 
 ```sh
-gh release create v1.2.4 \
+gh release create v1.2.5 \
   build/OnlyEQ.app.zip appcast-v2.xml \
-  --title "OnlyEQ 1.2.4" \
-  --notes-file release-notes/1.2.4.md \
+  --title "OnlyEQ 1.2.5" \
+  --notes-file release-notes/1.2.5.md \
   --target main
 ```
 

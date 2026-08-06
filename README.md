@@ -65,7 +65,7 @@ swift run OnlyEQ --profile-suggestion-probe # previews Bluetooth profile discove
 swift run OnlyEQ --menu-panel-probe    # previews the arrowless menu panel
 swift run OnlyEQ --screenshots out/   # renders the README screenshots
 ./scripts/build-app.sh release        # universal binary release build
-./scripts/prepare-release.sh 1.2.4    # signed archive + v2 appcast
+./scripts/prepare-release.sh 1.2.5    # signed archive + v2 appcast
 ```
 
 Tests run inside the binary because the Command Line Tools don't ship XCTest. Diagnostics land in `~/Library/Logs/OnlyEQ.log`.
