@@ -3,22 +3,19 @@
     <channel>
         <title>OnlyEQ</title>
         <item>
-            <title>1.2.4</title>
-            <pubDate>Thu, 30 Jul 2026 17:17:52 -0700</pubDate>
+            <title>1.2.5</title>
+            <pubDate>Wed, 05 Aug 2026 20:35:01 -0700</pubDate>
             <link>https://github.com/zollans/OnlyEQ</link>
-            <sparkle:version>20</sparkle:version>
-            <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
+            <sparkle:version>21</sparkle:version>
+            <sparkle:shortVersionString>1.2.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.4</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# OnlyEQ 1.2.4
+            <description sparkle:format="markdown"><![CDATA[# OnlyEQ 1.2.5
 
-This is a one-time manual update because OnlyEQ's automatic-update signing key changed. Install 1.2.4 from the GitHub release or with the installer command in the README. Automatic updates resume normally after 1.2.4 is installed.
-
-- Fixes a hardware-volume feedback loop that could make the output level oscillate after using volume keys or Control Center.
-- Smooths brief hardware-volume overshoot so the OnlyEQ slider no longer jitters while a key press settles.
-- Fixes silent output on multistream audio interfaces by selecting the stereo process-tap stream instead of physical input channels.
-- Safely mutes output when an aggregate device exposes an unsupported or changing input topology.
+- Tears down the muted process tap immediately when Core Audio temporarily has no usable output, preventing a device transition from muting the Mac or stalling playback.
+- Restarts processing when a complete output topology returns, including when Core Audio reuses the previous device object ID.
+- Clears stale route and audio-confirmation state whenever the engine stops or begins a new start attempt.
 ]]></description>
-            <enclosure url="https://github.com/zollans/OnlyEQ/releases/download/v1.2.4/OnlyEQ.app.zip" length="2690420" type="application/octet-stream" sparkle:edSignature="x9Os4Kcz0IOtHDL9yY7EuNxlf4wqKs0A5ntTurWBXaObLhD1rTtWsFr2AMF8HcPeD+7MyJ4UUKk6XxvFOsp/Aw=="/>
+            <enclosure url="https://github.com/zollans/OnlyEQ/releases/download/v1.2.5/OnlyEQ.app.zip" length="2690682" type="application/octet-stream" sparkle:edSignature="iI0wymIhk8fq78TR4+fgvFPgZixUiz2J+g9EgX6BnRS59sX+hX7o+SVAuxXk90z68m36TJy/Egb3cK0oEhb9CQ=="/>
         </item>
     </channel>
 </rss>
