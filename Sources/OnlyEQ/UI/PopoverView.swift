@@ -104,7 +104,18 @@ struct PopoverView: View {
                     .fixedSize()
                     Spacer(minLength: 0)
                 }
-                BoostSlider(value: $state.userVolumePercent, maxPercent: state.maxBoostPercent)
+                BoostSlider(
+                    value: $state.userVolumePercent,
+                    maxPercent: state.maxBoostPercent,
+                    onPreview: { state.previewVolumeAdjustment($0) },
+                    onEditingChanged: { editing in
+                        if editing {
+                            state.beginVolumeAdjustment()
+                        } else {
+                            state.endVolumeAdjustment()
+                        }
+                    }
+                )
             }
         }
     }
@@ -272,10 +283,13 @@ struct PopoverView: View {
 struct BoostSlider: View {
     @Binding var value: Double
     var maxPercent: Double
+    var onPreview: (Double) -> Void = { _ in }
+    var onEditingChanged: (_ editing: Bool) -> Void = { _ in }
     private let knobDiameter: CGFloat = 15
     @State private var trackedValue: Double?
-    @State private var lastPublishedTime: TimeInterval = 0
-    @State private var publicationInterval: TimeInterval = 1.0 / 60.0
+    @State private var lastPreviewTime: TimeInterval = 0
+    @State private var previewInterval: TimeInterval = 1.0 / 60.0
+    @State private var scrollCommit: DispatchWorkItem?
 
     var body: some View {
         let displayedValue = trackedValue ?? value
@@ -325,22 +339,26 @@ struct BoostSlider: View {
                     .gesture(DragGesture(minimumDistance: 0)
                         .onChanged { gesture in
                             let updated = sliderValue(at: gesture.location.x, width: width)
+                            beginTrackingIfNeeded(at: updated)
                             trackedValue = updated
                             let now = ProcessInfo.processInfo.systemUptime
-                            if lastPublishedTime == 0 {
-                                publicationInterval = DisplayRefreshRate.interval()
+                            if lastPreviewTime == 0 {
+                                previewInterval = DisplayRefreshRate.interval()
                             }
-                            if lastPublishedTime == 0 || now - lastPublishedTime >= publicationInterval {
-                                value = updated
-                                lastPublishedTime = now
+                            if lastPreviewTime == 0 || now - lastPreviewTime >= previewInterval {
+                                onPreview(updated)
+                                lastPreviewTime = now
                             }
                         }
                         .onEnded { gesture in
                             let updated = sliderValue(at: gesture.location.x, width: width)
-                            value = updated
-                            trackedValue = nil
-                            lastPublishedTime = 0
+                            finishTracking(at: updated)
                         })
+                    .overlay {
+                        ScrollWheelMonitor { deltaY, isPrecise in
+                            adjustFromScroll(deltaY: deltaY, isPrecise: isPrecise)
+                        }
+                    }
                 }
                 .frame(height: 18)
             }
@@ -363,6 +381,9 @@ struct BoostSlider: View {
             // above so 0%, 100%, and max stay under the actual track.
             .padding(.leading, 68)
         }
+        .onDisappear {
+            if let trackedValue { finishTracking(at: trackedValue) }
+        }
     }
 
     private func sliderValue(at x: CGFloat, width: CGFloat) -> Double {
@@ -372,6 +393,101 @@ struct BoostSlider: View {
 
     private func sliderPosition(for fraction: Double, width: CGFloat) -> CGFloat {
         knobDiameter / 2 + CGFloat(fraction) * max(width - knobDiameter, 0)
+    }
+
+    private func beginTrackingIfNeeded(at currentValue: Double) {
+        guard trackedValue == nil else { return }
+        trackedValue = currentValue
+        onEditingChanged(true)
+    }
+
+    private func finishTracking(at finalValue: Double) {
+        scrollCommit?.cancel()
+        scrollCommit = nil
+        onPreview(finalValue)
+        value = finalValue
+        trackedValue = nil
+        lastPreviewTime = 0
+        onEditingChanged(false)
+    }
+
+    private func adjustFromScroll(deltaY: CGFloat, isPrecise: Bool) {
+        let currentValue = trackedValue ?? value
+        let updated = Self.valueAfterScroll(
+            currentValue, deltaY: deltaY, isPrecise: isPrecise, maxPercent: maxPercent
+        )
+        guard updated != currentValue else { return }
+
+        beginTrackingIfNeeded(at: currentValue)
+        trackedValue = updated
+        onPreview(updated)
+
+        scrollCommit?.cancel()
+        let work = DispatchWorkItem { finishTracking(at: updated) }
+        scrollCommit = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+    }
+
+    static func valueAfterScroll(_ currentValue: Double, deltaY: CGFloat,
+                                 isPrecise: Bool, maxPercent: Double) -> Double {
+        let pointsPerUnit = isPrecise ? 0.2 : 2.0
+        return min(max(currentValue + Double(deltaY) * pointsPerUnit, 0), maxPercent)
+    }
+}
+
+/// Observes scroll-wheel events over the slider without taking hit-testing
+/// away from SwiftUI's drag gesture.
+private struct ScrollWheelMonitor: NSViewRepresentable {
+    var onScroll: (_ deltaY: CGFloat, _ isPrecise: Bool) -> Void
+
+    func makeNSView(context: Context) -> ScrollWheelMonitoringView {
+        ScrollWheelMonitoringView(onScroll: onScroll)
+    }
+
+    func updateNSView(_ view: ScrollWheelMonitoringView, context: Context) {
+        view.onScroll = onScroll
+    }
+}
+
+@MainActor
+private final class ScrollWheelMonitoringView: NSView {
+    var onScroll: (_ deltaY: CGFloat, _ isPrecise: Bool) -> Void
+    private var eventMonitor: Any?
+
+    init(onScroll: @escaping (_ deltaY: CGFloat, _ isPrecise: Bool) -> Void) {
+        self.onScroll = onScroll
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            removeEventMonitor()
+        } else if eventMonitor == nil {
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                let location = self.convert(event.locationInWindow, from: nil)
+                guard self.bounds.contains(location), event.scrollingDeltaY != 0 else { return event }
+                self.onScroll(event.scrollingDeltaY, event.hasPreciseScrollingDeltas)
+                return nil
+            }
+        }
+    }
+
+    private func removeEventMonitor() {
+        guard let eventMonitor else { return }
+        NSEvent.removeMonitor(eventMonitor)
+        self.eventMonitor = nil
+    }
+
+    deinit {
+        if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
     }
 }
 

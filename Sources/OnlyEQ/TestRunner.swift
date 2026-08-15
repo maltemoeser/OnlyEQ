@@ -295,6 +295,24 @@ enum TestRunner {
         expect(TapInputSelection.select(tapFormat: nonInterleaved, aggregateInputFormats: [nonInterleaved], aggregateInputChannels: [2]) == nil, "tap selection rejects non-interleaved tap format")
         expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [physical], aggregateInputChannels: [4]) == nil, "tap selection rejects missing stereo stream")
         expect(TapInputSelection.select(tapFormat: stereo, aggregateInputFormats: [stereo, stereo], aggregateInputChannels: [2, 2]) == nil, "tap selection rejects ambiguous stereo streams")
+        expect(TapInputSelection.select(tapFormat: stereo,
+                                        aggregateInputFormats: [stereo, stereo],
+                                        aggregateInputChannels: [2, 2],
+                                        aggregateInputStartingChannels: [1, 3],
+                                        physicalInputChannelCount: 2) == TapInputSelection(bufferIndex: 1, channels: 2),
+               "tap selection resolves Scarlett-style matching stereo input at channel boundary")
+        expect(TapInputSelection.select(tapFormat: stereo,
+                                        aggregateInputFormats: [stereo, stereo],
+                                        aggregateInputChannels: [2, 2],
+                                        aggregateInputStartingChannels: [3, 1],
+                                        physicalInputChannelCount: 2) == TapInputSelection(bufferIndex: 0, channels: 2),
+               "tap selection uses channel provenance rather than stream-array order")
+        expect(TapInputSelection.select(tapFormat: stereo,
+                                        aggregateInputFormats: [stereo, stereo],
+                                        aggregateInputChannels: [2, 2],
+                                        aggregateInputStartingChannels: [1, 3],
+                                        physicalInputChannelCount: 4) == nil,
+               "tap selection rejects matching streams without the expected channel boundary")
 
         let reversedEngine = ProcessTapEngine(preparedInput: TapInputSelection(bufferIndex: 0, channels: 2))
         var reversedTapInput = (0..<frames).flatMap { _ in [Float(0.125), Float(-0.25)] }
@@ -470,6 +488,20 @@ enum TestRunner {
 
     private static func appStateTests() {
         expect(
+            BoostSlider.valueAfterScroll(50, deltaY: 1, isPrecise: false, maxPercent: 200) == 52,
+            "volume mouse wheel uses two-percent steps"
+        )
+        expect(
+            near(BoostSlider.valueAfterScroll(50, deltaY: 5, isPrecise: true, maxPercent: 200), 51),
+            "volume trackpad scroll uses fine-grained steps"
+        )
+        expect(
+            BoostSlider.valueAfterScroll(199, deltaY: 3, isPrecise: false, maxPercent: 200) == 200
+                && BoostSlider.valueAfterScroll(1, deltaY: -3, isPrecise: false, maxPercent: 200) == 0,
+            "volume scrolling clamps to its configured range"
+        )
+
+        expect(
             !AppState.shouldSuggestAudioAccessCheck(
                 isEnabled: true,
                 engineIsRunning: true,
@@ -536,10 +568,22 @@ enum TestRunner {
             let state = AppState.shared
             let savedPreset = state.preset
             let savedAuto = state.autoPreampEnabled
+            let savedVolume = state.userVolumePercent
             defer {
                 state.preset = savedPreset
                 state.autoPreampEnabled = savedAuto
+                state.userVolumePercent = savedVolume
             }
+
+            var volumePublishes = 0
+            let volumeSubscription = state.objectWillChange.sink { _ in volumePublishes += 1 }
+            state.beginVolumeAdjustment()
+            state.previewVolumeAdjustment(min(savedVolume + 1, state.maxBoostPercent))
+            expect(volumePublishes == 0, "live volume preview does not invalidate the whole app")
+            state.userVolumePercent = min(savedVolume + 1, state.maxBoostPercent)
+            state.endVolumeAdjustment()
+            expect(volumePublishes == 1, "finished volume adjustment publishes once")
+            withExtendedLifetime(volumeSubscription) {}
 
             state.autoPreampEnabled = true
             state.preset = EQPreset(name: "Auto A", bands: [EQBand(type: .peak, frequency: 1000, gain: 5, q: 1.41)])

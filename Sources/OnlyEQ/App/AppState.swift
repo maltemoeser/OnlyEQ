@@ -125,6 +125,7 @@ final class AppState: ObservableObject {
     private var currentDeviceHasHardwareVolume = false
     private var lastPushedSoftwareGainDB = Double.nan
     private var pendingExternalVolumeSync: DispatchWorkItem?
+    private var userIsAdjustingVolume = false
     private struct HardwareVolumeListener {
         let deviceID: AudioObjectID
         let address: AudioObjectPropertyAddress
@@ -189,11 +190,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func pushToProcessor() {
-        let outputGainDB = softwareGainDB
+    private func pushToProcessor(outputGainDB overrideOutputGainDB: Double? = nil,
+                                 preampDB overridePreampDB: Double? = nil) {
+        let outputGainDB = overrideOutputGainDB ?? softwareGainDB
         engine.processor.update(
             bands: preset.bands,
-            preampDB: effectivePreampDB,
+            preampDB: overridePreampDB ?? effectivePreampDB,
             outputGainDB: outputGainDB,
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
@@ -493,6 +495,10 @@ final class AppState: ObservableObject {
     // MARK: - Volume
 
     private var softwareGainDB: Double {
+        softwareGainDB(for: volumePercent)
+    }
+
+    private func softwareGainDB(for volumePercent: Double) -> Double {
         let percent = max(volumePercent, 1)
         if hasHardwareVolume {
             return percent > 100 ? 20 * log10(percent / 100) : 0
@@ -517,6 +523,39 @@ final class AppState: ObservableObject {
             volumePercent = newValue
             pushHardwareVolume(newValue)
         }
+    }
+
+    /// Continuous controls preview volume without publishing `volumePercent`.
+    /// Publishing on every pointer or trackpad event invalidates all SwiftUI
+    /// trees that observe AppState, including alive-but-hidden windows, and can
+    /// starve the display-linked spectrum animation. The control commits the
+    /// final value through `userVolumePercent` when the interaction ends.
+    func beginVolumeAdjustment() {
+        pendingExternalVolumeSync?.cancel()
+        pendingExternalVolumeSync = nil
+        userIsAdjustingVolume = true
+    }
+
+    func previewVolumeAdjustment(_ percent: Double) {
+        guard !Self.screenshotMode else { return }
+        let outputGainDB = softwareGainDB(for: percent)
+        if !outputGainDB.isApproximatelyEqual(to: lastPushedSoftwareGainDB) {
+            pushToProcessor(outputGainDB: outputGainDB)
+        }
+        pushHardwareVolume(percent)
+    }
+
+    func endVolumeAdjustment() {
+        userIsAdjustingVolume = false
+    }
+
+    /// The editor graph deliberately excludes preamp, so previewing it directly
+    /// in the processor avoids rebuilding that graph and every other AppState
+    /// observer for each slider event. The final preset value is committed when
+    /// the drag ends.
+    func previewManualPreampDB(_ preampDB: Double) {
+        guard !Self.screenshotMode else { return }
+        pushToProcessor(preampDB: preampDB)
     }
 
     private func applySoftwareGain() {
@@ -546,7 +585,7 @@ final class AppState: ObservableObject {
     /// that sweeps the volume keeps updating steadily instead of freezing until
     /// release.
     private func scheduleExternalVolumeSync() {
-        guard pendingExternalVolumeSync == nil else { return }
+        guard !userIsAdjustingVolume, pendingExternalVolumeSync == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             self?.pendingExternalVolumeSync = nil
             self?.syncVolumeFromDevice(externalChange: true)
@@ -556,6 +595,7 @@ final class AppState: ObservableObject {
     }
 
     private func syncVolumeFromDevice(externalChange: Bool = false) {
+        guard !userIsAdjustingVolume else { return }
         guard let device = currentDevice else {
             currentDeviceHasHardwareVolume = false
             return
