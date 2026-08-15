@@ -470,6 +470,20 @@ enum TestRunner {
 
     private static func appStateTests() {
         expect(
+            BoostSlider.valueAfterScroll(50, deltaY: 1, isPrecise: false, maxPercent: 200) == 52,
+            "volume mouse wheel uses two-percent steps"
+        )
+        expect(
+            near(BoostSlider.valueAfterScroll(50, deltaY: 5, isPrecise: true, maxPercent: 200), 51),
+            "volume trackpad scroll uses fine-grained steps"
+        )
+        expect(
+            BoostSlider.valueAfterScroll(199, deltaY: 3, isPrecise: false, maxPercent: 200) == 200
+                && BoostSlider.valueAfterScroll(1, deltaY: -3, isPrecise: false, maxPercent: 200) == 0,
+            "volume scrolling clamps to its configured range"
+        )
+
+        expect(
             !AppState.shouldSuggestAudioAccessCheck(
                 isEnabled: true,
                 engineIsRunning: true,
@@ -536,10 +550,22 @@ enum TestRunner {
             let state = AppState.shared
             let savedPreset = state.preset
             let savedAuto = state.autoPreampEnabled
+            let savedVolume = state.userVolumePercent
             defer {
                 state.preset = savedPreset
                 state.autoPreampEnabled = savedAuto
+                state.userVolumePercent = savedVolume
             }
+
+            var volumePublishes = 0
+            let volumeSubscription = state.objectWillChange.sink { _ in volumePublishes += 1 }
+            state.beginVolumeAdjustment()
+            state.previewVolumeAdjustment(min(savedVolume + 1, state.maxBoostPercent))
+            expect(volumePublishes == 0, "live volume preview does not invalidate the whole app")
+            state.userVolumePercent = min(savedVolume + 1, state.maxBoostPercent)
+            state.endVolumeAdjustment()
+            expect(volumePublishes == 1, "finished volume adjustment publishes once")
+            withExtendedLifetime(volumeSubscription) {}
 
             state.autoPreampEnabled = true
             state.preset = EQPreset(name: "Auto A", bands: [EQBand(type: .peak, frequency: 1000, gain: 5, q: 1.41)])

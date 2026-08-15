@@ -263,6 +263,7 @@ private final class SpectrumBarsNSView: NSView {
     private var lastAnalysisTime: CFTimeInterval = 0
     private var barOpacity = 0.10
     private var heightScale = 0.75
+    private var configuredStyle: EQCurveView.SpectrumStyle?
 
     init(spectrum: SpectrumAnalyzer) {
         self.spectrum = spectrum
@@ -278,6 +279,8 @@ private final class SpectrumBarsNSView: NSView {
     }
 
     func configure(style: EQCurveView.SpectrumStyle) {
+        guard configuredStyle != style else { return }
+        configuredStyle = style
         barOpacity = style.opacity
         heightScale = style.heightScale
         updateColors()

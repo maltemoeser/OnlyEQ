@@ -208,17 +208,15 @@ struct EditorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
-            Text(String(format: "%.1f dB", state.effectivePreampDB))
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .frame(width: 52, alignment: .trailing)
-                .fixedSize(horizontal: true, vertical: false)
-                .layoutPriority(2)
-            Slider(value: Binding(
-                get: { state.preset.preampDB },
-                set: { state.preset.preampDB = ($0 * 10).rounded() / 10 }
-            ), in: -20...0)
-                .frame(minWidth: 72, idealWidth: 150, maxWidth: 160)
-                .disabled(state.autoPreampEnabled)
+            ManualPreampControl(
+                value: Binding(
+                    get: { state.preset.preampDB },
+                    set: { state.preset.preampDB = $0 }
+                ),
+                effectiveValue: state.effectivePreampDB,
+                isDisabled: state.autoPreampEnabled,
+                onPreview: { state.previewManualPreampDB($0) }
+            )
             Toggle("Auto", isOn: $state.autoPreampEnabled)
                 .toggleStyle(.checkbox)
                 .fixedSize(horizontal: true, vertical: false)
@@ -265,6 +263,49 @@ struct EditorView: View {
             }
         }
         .padding(20)
+    }
+}
+
+/// Keeps manual-preamp tracking local so the rest of the editor only observes
+/// the single committed preset change at drag end.
+private struct ManualPreampControl: View {
+    @Binding var value: Double
+    var effectiveValue: Double
+    var isDisabled: Bool
+    var onPreview: (Double) -> Void
+    @State private var trackedValue: Double?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(String(format: "%.1f dB", trackedValue ?? effectiveValue))
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .frame(width: 52, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(2)
+            Slider(
+                value: Binding(
+                    get: { trackedValue ?? value },
+                    set: { updated in
+                        let rounded = (updated * 10).rounded() / 10
+                        trackedValue = rounded
+                        onPreview(rounded)
+                    }
+                ),
+                in: -20...0,
+                onEditingChanged: { editing in
+                    if !editing { commitTrackedValue() }
+                }
+            )
+            .frame(minWidth: 72, idealWidth: 150, maxWidth: 160)
+            .disabled(isDisabled)
+        }
+        .onDisappear { commitTrackedValue() }
+    }
+
+    private func commitTrackedValue() {
+        guard let trackedValue else { return }
+        value = trackedValue
+        self.trackedValue = nil
     }
 }
 
