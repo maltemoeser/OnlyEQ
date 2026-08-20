@@ -72,6 +72,7 @@ struct EditorView: View {
             } label: {
                 Image(systemName: "square.and.arrow.down.on.square")
             }
+            .keyboardShortcut("s", modifiers: .command)
             .help("Save as preset")
 
             Spacer()

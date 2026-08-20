@@ -77,7 +77,8 @@ if CommandLine.arguments.contains("--engine-probe") {
 }
 
 MainActor.assumeIsolated {
-    if CommandLine.arguments.contains("--menu-panel-probe") {
+    if CommandLine.arguments.contains("--menu-panel-probe")
+        || CommandLine.arguments.contains("--accessory-import-probe") {
         AppState.screenshotMode = true
     }
     let app = NSApplication.shared

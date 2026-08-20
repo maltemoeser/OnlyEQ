@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var localMouseMonitor: Any?
     private var workspaceActivationObserver: NSObjectProtocol?
     private var hidePanelObserver: NSObjectProtocol?
+    private let appShortcutMonitor = AppShortcutMonitor()
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
         updaterDelegate: nil,
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("app: didFinishLaunching")
         NSApp.setActivationPolicy(.accessory)
+        appShortcutMonitor.start()
 
         let state = AppState.shared
         state.onProfileSuggestion = { suggestion in
@@ -73,6 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { NSApp.terminate(nil) }
         }
 
+        if CommandLine.arguments.contains("--accessory-import-probe") {
+            DispatchQueue.main.async { WindowManager.shared.showEditor(importing: true) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
+        }
+
         HotKeyManager.shared.install()
 
         if !UserDefaults.standard.bool(forKey: "onboarded") {
@@ -87,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSWorkspace.shared.notificationCenter.removeObserver(workspaceActivationObserver)
         }
         if let hidePanelObserver { NotificationCenter.default.removeObserver(hidePanelObserver) }
+        appShortcutMonitor.stop()
         AppState.shared.flushWorkingPresetPersistence()
         AppState.shared.engine.stop()
     }
