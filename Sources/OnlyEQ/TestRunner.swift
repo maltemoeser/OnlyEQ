@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import CoreAudio
 import Foundation
@@ -26,6 +27,7 @@ enum TestRunner {
     static func run() -> Int32 {
         do {
             try importerTests()
+            textEditingShortcutTests()
             dspTests()
             watchdogTests()
             engineRenderTests()
@@ -37,6 +39,37 @@ enum TestRunner {
         print("\(passed) checks passed, \(failures.count) failed")
         for f in failures { print("  FAIL: \(f)") }
         return failures.isEmpty ? 0 : 1
+    }
+
+    private static func textEditingShortcutTests() {
+        final class PasteProbeTextView: NSTextView {
+            var receivedPaste = false
+
+            override func paste(_ sender: Any?) {
+                receivedPaste = true
+            }
+        }
+
+        let command: NSEvent.ModifierFlags = .command
+        expect(AppShortcutMonitor.editingAction(characters: "a", modifiers: command)
+               == #selector(NSText.selectAll(_:)), "Command-A maps to Select All")
+        expect(AppShortcutMonitor.editingAction(characters: "v", modifiers: command)
+               == #selector(NSText.paste(_:)), "Command-V maps to Paste")
+        expect(AppShortcutMonitor.editingAction(characters: "z", modifiers: [.command, .shift])
+               == Selector(("redo:")), "Command-Shift-Z maps to Redo")
+        expect(AppShortcutMonitor.editingAction(characters: "v", modifiers: [.command, .option]) == nil,
+               "modified Command-V is not intercepted")
+        expect(AppShortcutMonitor.editingAction(characters: "v", modifiers: []) == nil,
+               "plain V is not intercepted")
+        expect(AppShortcutMonitor.isCloseWindowShortcut(characters: "w", modifiers: command),
+               "Command-W maps to Close Window")
+        expect(!AppShortcutMonitor.isCloseWindowShortcut(characters: "w", modifiers: [.command, .shift]),
+               "modified Command-W is not intercepted")
+
+        let textView = PasteProbeTextView()
+        let action = AppShortcutMonitor.editingAction(characters: "v", modifiers: command)
+        let delivered = action.map { textView.tryToPerform($0, with: nil) } ?? false
+        expect(delivered && textView.receivedPaste, "Paste selector is handled by a text responder")
     }
 
     private static func importerTests() throws {

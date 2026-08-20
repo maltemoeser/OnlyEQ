@@ -3,20 +3,19 @@
     <channel>
         <title>OnlyEQ</title>
         <item>
-            <title>1.2.6</title>
-            <pubDate>Sat, 15 Aug 2026 16:26:49 -0700</pubDate>
+            <title>1.2.7</title>
+            <pubDate>Wed, 19 Aug 2026 19:40:33 -0700</pubDate>
             <link>https://github.com/zollans/OnlyEQ</link>
-            <sparkle:version>22</sparkle:version>
-            <sparkle:shortVersionString>1.2.6</sparkle:shortVersionString>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>1.2.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.4</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# OnlyEQ 1.2.6
+            <description sparkle:format="markdown"><![CDATA[# OnlyEQ 1.2.7
 
-- Supports stereo-input audio interfaces, including Focusrite Scarlett-style devices whose physical input and process tap expose identical stereo formats.
-- Keeps tap routing fail-safe by using Core Audio channel provenance only when format matching is ambiguous, and refusing topologies that still cannot identify one unique tap stream.
-- Keeps the spectrum, meter, and rest of the app responsive while adjusting volume or manual preamp by previewing audio changes without rebuilding every SwiftUI view.
-- Adds mouse-wheel and trackpad volume control when the pointer is over the volume slider.
+- Restores Command-A, Command-C, Command-V, Command-X, and undo/redo in text fields while OnlyEQ runs as a menu-bar accessory.
+- Adds Command-S for visible “Save as preset” actions and Command-W for closing the active OnlyEQ window.
+- Shows a clear format error after pasted EQ text cannot be recognized instead of silently doing nothing.
 ]]></description>
-            <enclosure url="https://github.com/zollans/OnlyEQ/releases/download/v1.2.6/OnlyEQ.app.zip" length="2719632" type="application/octet-stream" sparkle:edSignature="hohnYoPy/eoXFH7eIAhh2oMfqTXaEo6yvIkS2GeUE2AJYf6B2AnJmhi5ydmQ1mnbT75YyzOickWj3o3zyuuVDw=="/>
+            <enclosure url="https://github.com/zollans/OnlyEQ/releases/download/v1.2.7/OnlyEQ.app.zip" length="2742855" type="application/octet-stream" sparkle:edSignature="dLf1+yYJLsk8if3RN8V/8OUAd5ZfVFULgKmsf9Qfi/LHcdeFVd7tiw4640/O0iIyDygAkrCo1qABG2NcYvzaBg=="/>
         </item>
     </channel>
 </rss>

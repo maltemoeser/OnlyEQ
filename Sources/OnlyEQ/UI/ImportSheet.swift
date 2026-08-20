@@ -149,13 +149,22 @@ struct ImportSheet: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .onChange(of: pastedText) { _, text in
-                    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                .task(id: pastedText) {
+                    let text = pastedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else {
                         staged = nil
                         errorMessage = nil
                         return
                     }
-                    stage(silent: true) { try PresetImporter.importText(text) }
+
+                    // Let multi-line paste and ordinary typing settle before
+                    // parsing. A new edit automatically cancels this task.
+                    do {
+                        try await Task.sleep(for: .milliseconds(250))
+                    } catch {
+                        return
+                    }
+                    stage { try PresetImporter.importText(text) }
                 }
             stagedPreview
         }
@@ -348,6 +357,7 @@ struct ImportSheet: View {
                         dismiss()
                     }
                 }
+                .keyboardShortcut("s", modifiers: .command)
             }
             Spacer()
             Button("Cancel") { dismiss() }
