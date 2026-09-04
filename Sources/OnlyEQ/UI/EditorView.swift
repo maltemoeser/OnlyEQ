@@ -489,10 +489,13 @@ struct BandCard: View {
     }
 
     private func parseFreq(_ s: String) -> Double? {
-        let cleaned = s.lowercased().replacingOccurrences(of: "hz", with: "").trimmingCharacters(in: .whitespaces)
-        if cleaned.hasSuffix("k") { return Double(cleaned.dropLast()).map { $0 * 1000 } }
-        if s.lowercased().contains("khz") { return Double(cleaned.replacingOccurrences(of: "k", with: "")).map { $0 * 1000 } }
-        return Double(cleaned)
+        var cleaned = s.lowercased().replacingOccurrences(of: "hz", with: "").trimmingCharacters(in: .whitespaces)
+        var multiplier = 1.0
+        if cleaned.hasSuffix("k") {
+            cleaned = String(cleaned.dropLast()).trimmingCharacters(in: .whitespaces)
+            multiplier = 1000
+        }
+        return Double(cleaned).map { $0 * multiplier }
     }
 
     private func valueRow(_ label: String, value: Binding<Double>,
@@ -500,7 +503,10 @@ struct BandCard: View {
                           parse: @escaping (String) -> Double?) -> some View {
         HStack(spacing: 4) {
             Text(label).font(.system(size: 9)).foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
-            EditableValueField(text: format(value.wrappedValue)) { input in
+            // The draft carries the exact unitless value so a band shown as
+            // "1.5 kHz" edits as "1534", not "1.5" (which would parse as 1.5 Hz).
+            EditableValueField(text: format(value.wrappedValue),
+                               editText: String(format: "%g", value.wrappedValue)) { input in
                 if let parsed = parse(input) { value.wrappedValue = parsed }
             }
         }
@@ -510,6 +516,7 @@ struct BandCard: View {
 /// A tiny click-to-edit text field for band values.
 struct EditableValueField: View {
     var text: String
+    var editText: String
     var onCommit: (String) -> Void
 
     @State private var editing = false
@@ -532,7 +539,7 @@ struct EditableValueField: View {
                 .padding(.vertical, 2).padding(.horizontal, 4)
                 .background(RoundedRectangle(cornerRadius: 4).fill(.quaternary.opacity(0.5)))
                 .onTapGesture {
-                    draft = text.components(separatedBy: " ").first ?? text
+                    draft = editText
                     editing = true
                 }
         }
