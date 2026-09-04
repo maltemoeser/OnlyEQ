@@ -176,20 +176,31 @@ struct PopoverView: View {
     private var curvePreview: some View {
         Card {
             VStack(spacing: 5) {
-                ZStack(alignment: .topTrailing) {
+                ZStack(alignment: .top) {
                     EQCurveView(bands: state.preset.bands, preampDB: 0,
                                 showSpectrum: state.isEnabled && state.popoverIsVisible,
                                 spectrumStyle: .subtle)
                         .frame(height: 116)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    Button {
-                        WindowManager.shared.showEditor()
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                            .font(.system(size: 10, weight: .medium))
+                    HStack {
+                        Toggle(isOn: $state.crossfeedEnabled) {
+                            Label("Crossfeed", systemImage: "headphones")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .toggleStyle(.button)
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .help("Blend a little of each channel into the other for headphones")
+                        Spacer()
+                        Button {
+                            WindowManager.shared.showEditor()
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
                     .padding(3)
                 }
                 FrequencyAxisLabels(compact: true)

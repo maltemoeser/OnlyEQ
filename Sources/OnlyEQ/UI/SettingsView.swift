@@ -270,6 +270,23 @@ struct AdvancedSettings: View {
                 }
             }
 
+            Section {
+                Toggle(isOn: $state.crossfeedEnabled) {
+                    Text("Crossfeed")
+                    Text("Blend a little of each channel into the other, as speakers do, so hard-panned recordings sound less split on headphones.")
+                }
+                if state.crossfeedEnabled {
+                    LabeledContent("Amount") {
+                        Slider(value: $state.crossfeedLevelDB, in: -12.0...(-3.0)) {
+                            Text("Amount")
+                        }
+                        Text(String(format: "%.0f dB", state.crossfeedLevelDB))
+                            .font(.system(size: 11).monospacedDigit())
+                            .frame(width: 64, alignment: .trailing)
+                    }
+                }
+            }
+
             Picker(selection: $state.maxBoostPercent) {
                 Text("100% (no boost)").tag(100.0)
                 Text("150%").tag(150.0)

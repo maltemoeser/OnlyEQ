@@ -199,6 +199,49 @@ enum TestRunner {
         }
     }
 
+    private static func crossfeedTests() {
+        func run(levelDB: Double, hz: Double, left: Float, right: Float) -> (left: Float, right: Float) {
+            let proc = EQProcessor()
+            proc.configure(sampleRate: 48000)
+            proc.update(bands: [], preampDB: 0, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false,
+                        crossfeedEnabled: true, crossfeedLevelDB: levelDB)
+            var l = (0..<9600).map { Float(sin(Double($0) * 2 * .pi * hz / 48000)) * left }
+            var r = (0..<9600).map { Float(sin(Double($0) * 2 * .pi * hz / 48000)) * right }
+            l.withUnsafeMutableBufferPointer { lb in
+                r.withUnsafeMutableBufferPointer { rb in
+                    proc.process(channels: [lb.baseAddress!, rb.baseAddress!], frameCount: 9600)
+                }
+            }
+            return (l[4800...].map(abs).max() ?? 0, r[4800...].map(abs).max() ?? 0)
+        }
+
+        let mono = run(levelDB: -6, hz: 100, left: 1, right: 1)
+        expect(abs(mono.left - 1) < 0.01 && abs(mono.right - 1) < 0.01, "crossfeed passes centred content at unity")
+
+        // Hard-left 100 Hz at -6 dB feed: the far ear gets ~0.5, the near ear gives up the same.
+        let bass = run(levelDB: -6, hz: 100, left: 1, right: 0)
+        expect(abs(bass.right - 0.5) < 0.03, "crossfeed feeds bass to the far ear at the set level")
+        // The compensation term lags (low-pass phase + 0.3 ms delay), so the
+        // near ear sits a little above 0.5 rather than exactly on it.
+        expect(bass.left > 0.5 && bass.left < 0.62, "crossfeed compensates the near ear's bass")
+
+        // Hard-left 10 kHz: well above the cutoff, almost nothing crosses over.
+        let treble = run(levelDB: -6, hz: 10000, left: 1, right: 0)
+        expect(treble.right < 0.06, "crossfeed leaves treble localisation alone")
+        expect(treble.left > 0.95, "crossfeed leaves near-ear treble alone")
+
+        let off = EQProcessor()
+        off.configure(sampleRate: 48000)
+        off.update(bands: [], preampDB: 0, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false)
+        var l = [Float](repeating: 1, count: 256), r = [Float](repeating: 0, count: 256)
+        l.withUnsafeMutableBufferPointer { lb in
+            r.withUnsafeMutableBufferPointer { rb in
+                off.process(channels: [lb.baseAddress!, rb.baseAddress!], frameCount: 256)
+            }
+        }
+        expect(r[255] == 0, "crossfeed is inert when disabled")
+    }
+
     private static func dspTests() {
         let c = BiquadCoefficients.make(type: .peak, frequency: 1000, gainDB: 6, q: 1.41, sampleRate: 48000)
         expect(near(c.magnitudeDB(at: 1000, sampleRate: 48000), 6, 0.01), "peak magnitude at Fc")
@@ -270,6 +313,8 @@ enum TestRunner {
             bypassProc.process(channels: [buf.baseAddress!], frameCount: 512)
         }
         expect(abs(bypassed[100] - 0.5) < 0.01, "bypass keeps output gain but skips preamp and bands")
+
+        crossfeedTests()
 
         let limProc = EQProcessor()
         limProc.configure(sampleRate: 48000)
