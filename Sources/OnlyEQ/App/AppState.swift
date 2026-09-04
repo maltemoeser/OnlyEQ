@@ -156,6 +156,17 @@ final class AppState: ObservableObject {
         }
         rebuildEngine()
         startSilenceWatchdog()
+        // Tap exclusions are resolved to PIDs when the tap is created, so an
+        // excluded app launched later would be tapped until the next rebuild.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+            Task { @MainActor in
+                guard let self, let bundleID, self.excludedBundleIDs.contains(bundleID) else { return }
+                self.rebuildEngine()
+            }
+        }
     }
 
     // MARK: - Engine control
