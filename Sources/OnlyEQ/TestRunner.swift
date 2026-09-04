@@ -215,6 +215,16 @@ enum TestRunner {
         let filteredPeak = filteredSine[2400...].map(abs).max() ?? 0
         expect(abs(filteredPeak - 0.2) < 0.01, "processor applies biquad gain at center frequency")
 
+        let bypassProc = EQProcessor()
+        bypassProc.configure(sampleRate: 48000)
+        bypassProc.update(bands: [EQBand(type: .peak, frequency: 1000, gain: 6, q: 1.41)],
+                          preampDB: -6, outputGainDB: -6.02, limiterEnabled: false, limiterCeilingDB: -1, bypassed: true)
+        var bypassed = [Float](repeating: 1.0, count: 512)
+        bypassed.withUnsafeMutableBufferPointer { buf in
+            bypassProc.process(channels: [buf.baseAddress!], frameCount: 512)
+        }
+        expect(abs(bypassed[100] - 0.5) < 0.01, "bypass keeps output gain but skips preamp and bands")
+
         let limProc = EQProcessor()
         limProc.configure(sampleRate: 48000)
         limProc.update(bands: [], preampDB: 12, limiterEnabled: true, limiterCeilingDB: -1, bypassed: false)
