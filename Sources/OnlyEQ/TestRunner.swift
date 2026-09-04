@@ -239,6 +239,28 @@ enum TestRunner {
         let filteredPeak = filteredSine[2400...].map(abs).max() ?? 0
         expect(abs(filteredPeak - 0.2) < 0.01, "processor applies biquad gain at center frequency")
 
+        // A same-topology update (gain tweak) must keep the filter history:
+        // continuing the sine without a discontinuity stays at the new level.
+        filterProc.update(bands: [EQBand(type: .peak, frequency: 1000, gain: 6.1, q: 1.41)],
+                          preampDB: 0, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false)
+        var continued = (4800..<9600).map { Float(0.1 * sin(Double($0) * 2 * .pi * 1000 / 48000)) }
+        continued.withUnsafeMutableBufferPointer { buffer in
+            filterProc.process(channels: [buffer.baseAddress!], frameCount: buffer.count)
+        }
+        let continuedPeak = continued[..<480].map(abs).max() ?? 0
+        expect(abs(continuedPeak - 0.2) < 0.02, "same-topology update keeps filter history")
+
+        // A band-count change adopts fresh, zeroed history sized for the new topology.
+        filterProc.update(bands: [EQBand(type: .peak, frequency: 1000, gain: 6, q: 1.41),
+                                  EQBand(type: .peak, frequency: 2000, gain: 0, q: 1.41)],
+                          preampDB: 0, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false)
+        var twoBand = (0..<4800).map { Float(0.1 * sin(Double($0) * 2 * .pi * 1000 / 48000)) }
+        twoBand.withUnsafeMutableBufferPointer { buffer in
+            filterProc.process(channels: [buffer.baseAddress!], frameCount: buffer.count)
+        }
+        let twoBandPeak = twoBand[2400...].map(abs).max() ?? 0
+        expect(abs(twoBandPeak - 0.2) < 0.01, "band-count change keeps processing correctly")
+
         let bypassProc = EQProcessor()
         bypassProc.configure(sampleRate: 48000)
         bypassProc.update(bands: [EQBand(type: .peak, frequency: 1000, gain: 6, q: 1.41)],
