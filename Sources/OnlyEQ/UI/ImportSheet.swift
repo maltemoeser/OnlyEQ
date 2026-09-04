@@ -352,8 +352,7 @@ struct ImportSheet: View {
             if staged != nil, tab == .browse {
                 Button("Save as preset…") {
                     if let staged {
-                        state.store.save(staged.preset)
-                        state.apply(staged.preset)
+                        state.apply(state.store.save(staged.preset))
                         dismiss()
                     }
                 }

@@ -191,6 +191,11 @@ enum TestRunner {
             let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
             expect(files.contains { $0.hasPrefix("presets.json.corrupt-") }, "undecodable presets.json is moved aside")
             expect(corrupt.customPresets == [edited], "store recovers to a fresh presets.json")
+
+            let replacement = EQPreset(name: "Working", preampDB: 0, bands: [EQBand(type: .peak, frequency: 500, gain: 2, q: 1)])
+            let stored = corrupt.save(replacement)
+            expect(stored.id == edited.id && stored.bands == replacement.bands, "saving under an existing name returns the stored id")
+            expect(corrupt.customPresets.count == 1, "saving under an existing name replaces, not appends")
         }
     }
 

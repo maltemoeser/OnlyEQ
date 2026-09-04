@@ -466,13 +466,12 @@ final class AppState: ObservableObject {
         var toSave = preset
         toSave.id = UUID()
         toSave.name = name
-        store.save(toSave)
-        preset = toSave
+        preset = store.save(toSave)
         presetWasAutoApplied = false
     }
 
-    func assignSuggestedPreset(_ preset: EQPreset, to suggestion: ProfileSuggestion) {
-        store.save(preset)
+    func assignSuggestedPreset(_ suggested: EQPreset, to suggestion: ProfileSuggestion) {
+        let preset = store.save(suggested)
         store.setProfile(deviceUID: suggestion.deviceUID, deviceName: suggestion.deviceName,
                          preset: preset, autoApply: true)
         // An explicit assignment beats whatever working state was stashed for
