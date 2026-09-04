@@ -139,6 +139,17 @@ enum TestRunner {
         r = try PresetImporter.importText("Filter 1: ON PK Fc 1000 Hz Gain -3.0 dB BW Oct 1")
         expect(near(r.preset.bands[0].q, 1.414, 0.01), "BW Oct → Q conversion")
 
+        r = try PresetImporter.importText("""
+            Filter 1: ON HP Fc 80 Hz
+            Filter 2: ON LPQ Fc 12000 Hz Q 0.707
+            Filter 3: ON AP Fc 1000 Hz Q 0.7
+            Filter 4: ON PK Fc 1000 Hz Gain -3 dB Q 1
+            """)
+        expect(r.preset.bands.count == 3, "gain-less filter lines are imported")
+        expect(r.preset.bands[0].type == .highPass && r.preset.bands[0].gain == 0, "HP line without gain")
+        expect(r.preset.bands[1].type == .lowPass && near(r.preset.bands[1].q, 0.707), "LPQ line keeps Q")
+        expect(r.warnings.contains { $0.contains("all-pass") }, "all-pass filter is reported as skipped")
+
         do {
             _ = try PresetImporter.importText("hello world, no EQ here")
             expect(false, "unrecognized input throws")
