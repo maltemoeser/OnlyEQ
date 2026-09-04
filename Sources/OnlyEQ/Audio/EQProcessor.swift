@@ -1,7 +1,7 @@
 import Foundation
 import os.lock
 
-/// Realtime-safe EQ chain: preamp → biquad cascade → soft limiter → output gain.
+/// Realtime-safe EQ chain: preamp → biquad cascade → crossfeed → output gain → limiter.
 ///
 /// The UI thread rebuilds a `Snapshot` and swaps it in under a lock; the render
 /// thread try-locks — if the lock is contended it keeps using the old snapshot
@@ -18,6 +18,7 @@ final class EQProcessor {
         var limiterEnabled = true
         var limiterCeilingLinear: Float = pow(10, -1.0 / 20)  // -1 dBFS
         var bypassed = false
+        var crossfeed = CrossfeedParameters()
     }
 
     private var snapshot = Snapshot()
@@ -32,6 +33,7 @@ final class EQProcessor {
     // Render-thread state (only touched on the audio thread).
     private var states: [BiquadState] = []  // flattened [channel][band]
     private var stateBandCount = 0
+    private var crossfeed = CrossfeedState()
     private var limiterEnvelope: Float = 0
     private var limiterAttack = Float(exp(-1.0 / (0.001 * 48000)))
     private var limiterRelease = Float(exp(-1.0 / (0.080 * 48000)))
@@ -71,12 +73,14 @@ final class EQProcessor {
     /// avoids allocating from the realtime callback.
     func resetRenderState() {
         for index in states.indices { states[index] = BiquadState() }
+        crossfeed.reset()
         limiterEnvelope = 0
     }
 
     /// Called from the UI/model thread whenever parameters change.
     func update(bands: [EQBand], preampDB: Double, outputGainDB: Double = 0,
-                limiterEnabled: Bool, limiterCeilingDB: Double, bypassed: Bool) {
+                limiterEnabled: Bool, limiterCeilingDB: Double, bypassed: Bool,
+                crossfeedEnabled: Bool = false, crossfeedLevelDB: Double = -6) {
         var snap = Snapshot()
         snap.coefficients = bands.filter(\.isEnabled).map {
             BiquadCoefficients.make(type: $0.type, frequency: $0.frequency, gainDB: $0.gain, q: $0.q, sampleRate: sampleRate)
@@ -86,6 +90,9 @@ final class EQProcessor {
         snap.limiterEnabled = limiterEnabled
         snap.limiterCeilingLinear = Float(pow(10, limiterCeilingDB / 20))
         snap.bypassed = bypassed
+        if crossfeedEnabled {
+            snap.crossfeed = CrossfeedParameters.make(levelDB: crossfeedLevelDB, sampleRate: sampleRate)
+        }
         snap.freshStates = Array(repeating: BiquadState(), count: Self.channelCapacity * snap.coefficients.count)
         os_unfair_lock_lock(&lock)
         pending = snap
@@ -134,9 +141,8 @@ final class EQProcessor {
                     let stateBase = stateBuffer.baseAddress
                     let coefficientBase = coefficientBuffer.baseAddress
 
+                    let applyCrossfeed = channelCount == 2 && snap.crossfeed.feed > 0
                     for frame in 0..<frameCount {
-                        // Stereo-linked limiter: find the loudest post-EQ sample across channels.
-                        var maxMag: Float = 0
                         for ch in 0..<channelCount {
                             var sample = channelBuffers[ch][frame] * preampLinear
                             if applyEQ, bandCount > 0, let stateBase, let coefficientBase {
@@ -145,7 +151,15 @@ final class EQProcessor {
                                     sample = channelStates[band].process(sample, coefficientBase[band])
                                 }
                             }
-                            sample *= snap.outputGainLinear
+                            channelBuffers[ch][frame] = sample
+                        }
+                        if applyCrossfeed {
+                            crossfeed.process(left: &channelBuffers[0][frame], right: &channelBuffers[1][frame], snap.crossfeed)
+                        }
+                        // Stereo-linked limiter: find the loudest post-EQ sample across channels.
+                        var maxMag: Float = 0
+                        for ch in 0..<channelCount {
+                            let sample = channelBuffers[ch][frame] * snap.outputGainLinear
                             channelBuffers[ch][frame] = sample
                             maxMag = max(maxMag, abs(sample))
                         }

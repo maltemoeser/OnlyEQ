@@ -47,6 +47,13 @@ final class AppState: ObservableObject {
     @Published var limiterCeilingDB = UserDefaults.standard.object(forKey: "limiterCeiling") as? Double ?? -1.0 {
         didSet { UserDefaults.standard.set(limiterCeilingDB, forKey: "limiterCeiling"); pushToProcessor() }
     }
+    @Published var crossfeedEnabled = UserDefaults.standard.bool(forKey: "crossfeed") {
+        didSet { UserDefaults.standard.set(crossfeedEnabled, forKey: "crossfeed"); pushToProcessor() }
+    }
+    /// Cross level in dB; -6 is a moderate Bauer setting, -3 strong, -9 subtle.
+    @Published var crossfeedLevelDB = UserDefaults.standard.object(forKey: "crossfeedLevel") as? Double ?? -6.0 {
+        didSet { UserDefaults.standard.set(crossfeedLevelDB, forKey: "crossfeedLevel"); pushToProcessor() }
+    }
 
     /// Volume as 0…maxBoost percent. ≤100 uses hardware volume when available;
     /// the portion above 100 % (or everything, for HDMI-style outputs) is software gain.
@@ -210,7 +217,9 @@ final class AppState: ObservableObject {
             outputGainDB: outputGainDB,
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
-            bypassed: bypassed || !isEnabled
+            bypassed: bypassed || !isEnabled,
+            crossfeedEnabled: crossfeedEnabled && isEnabled,
+            crossfeedLevelDB: crossfeedLevelDB
         )
         lastPushedSoftwareGainDB = outputGainDB
     }
@@ -485,6 +494,8 @@ final class AppState: ObservableObject {
         autoPreampEnabled = true
         limiterEnabled = true
         limiterCeilingDB = -1
+        crossfeedEnabled = false
+        crossfeedLevelDB = -6
         maxBoostPercent = 200
         excludedBundleIDs = ["com.apple.garageband10", "us.zoom.xos"]
         bufferFrames = 256
