@@ -362,15 +362,6 @@ struct ImportSheet: View {
 
     private var footer: some View {
         HStack {
-            if staged != nil, tab == .browse {
-                Button("Save as preset…") {
-                    if let staged {
-                        state.apply(state.store.save(staged.preset))
-                        dismiss()
-                    }
-                }
-                .keyboardShortcut("s", modifiers: .command)
-            }
             Spacer()
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
@@ -379,7 +370,9 @@ struct ImportSheet: View {
                     if let profileSuggestion {
                         state.assignSuggestedPreset(staged.preset, to: profileSuggestion)
                     } else {
-                        state.apply(staged.preset)
+                        // Save before applying so the preset stays in the
+                        // picker after switching to another one.
+                        state.apply(state.store.save(uniquelyNamed(staged.preset)))
                     }
                     dismiss()
                 }
@@ -389,6 +382,18 @@ struct ImportSheet: View {
             .disabled(staged == nil)
         }
         .padding(12)
+    }
+
+    /// Pasted text yields the generic name "Imported"; number it so a second
+    /// paste does not replace the first saved preset.
+    private func uniquelyNamed(_ preset: EQPreset) -> EQPreset {
+        let taken = Set(state.store.allPresets.map(\.name))
+        guard taken.contains(preset.name), preset.name == "Imported" else { return preset }
+        var named = preset
+        var n = 2
+        while taken.contains("Imported \(n)") { n += 1 }
+        named.name = "Imported \(n)"
+        return named
     }
 
     private func stage(_ work: () throws -> PresetImporter.ImportResult) {
