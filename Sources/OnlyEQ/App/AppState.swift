@@ -473,6 +473,26 @@ final class AppState: ObservableObject {
 
     func applyFlat() { apply(.flat) }
 
+    /// "Reset Everything" in Settings: presets, device profiles, working
+    /// state, and every preference back to first-launch defaults.
+    func resetToDefaults() {
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        }
+        store.removeAll()
+        suggestedDeviceUIDs = []
+        isEnabled = true
+        autoPreampEnabled = true
+        limiterEnabled = true
+        limiterCeilingDB = -1
+        maxBoostPercent = 200
+        excludedBundleIDs = ["com.apple.garageband10", "us.zoom.xos"]
+        bufferFrames = 256
+        autoSuggestHeadphoneProfiles = true
+        applyFlat()
+        userVolumePercent = 100
+    }
+
     func saveCurrentAsPreset(named name: String) {
         var toSave = preset
         toSave.id = UUID()

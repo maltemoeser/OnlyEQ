@@ -67,6 +67,13 @@ final class PresetStore: ObservableObject {
         persist()
     }
 
+    func removeAll() {
+        customPresets = []
+        deviceProfiles = [:]
+        workingPresets = [:]
+        persist()
+    }
+
     func stashWorkingPreset(_ preset: EQPreset, forDevice uid: String) {
         guard workingPresets[uid] != preset else { return }
         workingPresets[uid] = preset
