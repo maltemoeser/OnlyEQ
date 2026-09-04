@@ -172,6 +172,14 @@ enum TestRunner {
 
             let reloaded = PresetStore(directory: dir)
             expect(reloaded.workingPreset(forDevice: "uid-a") == edited, "working preset stash persists to disk")
+
+            let presetsURL = dir.appendingPathComponent("presets.json")
+            try? "{not json".data(using: .utf8)!.write(to: presetsURL)
+            let corrupt = PresetStore(directory: dir)
+            corrupt.save(edited)
+            let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+            expect(files.contains { $0.hasPrefix("presets.json.corrupt-") }, "undecodable presets.json is moved aside")
+            expect(corrupt.customPresets == [edited], "store recovers to a fresh presets.json")
         }
     }
 
