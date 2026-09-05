@@ -34,9 +34,9 @@ Version 1.2.4 therefore starts a new signing chain with a backed-up key and a se
 </p>
 
 - Parametric EQ with a draggable curve editor. Peak, shelves, high/low pass, notch, band pass — as many bands as you want.
-- Imports every headphone EQ format I could find: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac. Drop a file, paste text, or search the peqdb and AutoEq databases from inside the app.
+- Imports every headphone EQ format I could find: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac. Drop a file, paste text, or search the peqdb and AutoEq databases from inside the app. Anything you apply is saved and stays in the preset picker.
 - Per-device profiles. Your headphone preset kicks in when the headphones connect; your speakers keep theirs.
-- Volume boost up to 200%, automatic preamp so boosted EQ doesn't clip, a limiter as a safety net, A/B compare, one-click bypass.
+- Volume boost up to 200%, automatic preamp so boosted EQ doesn't clip, a limiter as a safety net, A/B compare, one-click bypass. Bypass keeps the preamp so the comparison is level-matched instead of the unprocessed side winning by being louder.
 - Loudness compensation: raises bass and treble as you turn the volume down below a reference level you set, following the equal-loudness contours, so quiet listening keeps its balance.
 - Crossfeed for headphones: blends a little low-passed, delayed signal from each channel into the other, so hard-panned recordings sound less split. Toggle it from the popover; the amount is in Settings.
 - An exclude list for apps that handle their own audio (DAWs, Zoom).
@@ -49,7 +49,7 @@ Version 1.2.4 therefore starts a new signing chain with a backed-up key and a se
 
 ## How it works
 
-A muted global process tap silences the original system output; the tap and the real output device get wrapped in a private aggregate device; an IO callback reads the tapped audio, runs it through RBJ cookbook biquads (plus preamp and a stereo-linked limiter), and writes it to the device. Filter changes swap in atomically without touching the audio thread.
+A muted global process tap silences the original system output; the tap and the real output device get wrapped in a private aggregate device; an IO callback reads the tapped audio, runs it through a chain of preamp, biquad filters, crossfeed, loudness shelves, output gain, and a stereo-linked limiter, and writes it to the device. The biquads use the RBJ cookbook analog prototypes realised with Vicanek's matched design rather than the bilinear transform, so peaks and shelves in the top octave keep their intended shape and a preset measures the same on a 44.1 kHz and a 96 kHz device. Filter changes swap in atomically without touching the audio thread.
 
 This is the same approach the newer generation of Mac audio tools moved to after macOS 14.4, and it kills the classic virtual-driver failure modes: Bluetooth devices distorting until reconnect, sample-rate mismatches, apps escaping the EQ because they pin their output device, and the driver breaking on every macOS update.
 
