@@ -47,6 +47,13 @@ final class AppState: ObservableObject {
     @Published var limiterCeilingDB = UserDefaults.standard.object(forKey: "limiterCeiling") as? Double ?? -1.0 {
         didSet { UserDefaults.standard.set(limiterCeilingDB, forKey: "limiterCeiling"); pushToProcessor() }
     }
+    @Published var loudnessEnabled = UserDefaults.standard.bool(forKey: "loudness") {
+        didSet { UserDefaults.standard.set(loudnessEnabled, forKey: "loudness"); pushToProcessor() }
+    }
+    /// Volume slider position at which no loudness compensation is applied.
+    @Published var loudnessReferencePercent = UserDefaults.standard.object(forKey: "loudnessReference") as? Double ?? 100 {
+        didSet { UserDefaults.standard.set(loudnessReferencePercent, forKey: "loudnessReference"); pushToProcessor() }
+    }
     @Published var crossfeedEnabled = UserDefaults.standard.bool(forKey: "crossfeed") {
         didSet { UserDefaults.standard.set(crossfeedEnabled, forKey: "crossfeed"); pushToProcessor() }
     }
@@ -209,11 +216,19 @@ final class AppState: ObservableObject {
     }
 
     private func pushToProcessor(outputGainDB overrideOutputGainDB: Double? = nil,
-                                 preampDB overridePreampDB: Double? = nil) {
+                                 preampDB overridePreampDB: Double? = nil,
+                                 volumePercent overrideVolumePercent: Double? = nil) {
         let outputGainDB = overrideOutputGainDB ?? softwareGainDB
+        // Loudness shelves ride along with the preset; their boost is taken
+        // off the preamp so a full-scale mix cannot clip on the way in.
+        let loudness = loudnessEnabled
+            ? LoudnessCompensation.bands(volumePercent: overrideVolumePercent ?? volumePercent,
+                                         referencePercent: loudnessReferencePercent)
+            : []
+        let loudnessHeadroomDB = loudness.map(\.gain).max() ?? 0
         engine.processor.update(
-            bands: preset.bands,
-            preampDB: overridePreampDB ?? effectivePreampDB,
+            bands: preset.bands + loudness,
+            preampDB: (overridePreampDB ?? effectivePreampDB) - loudnessHeadroomDB,
             outputGainDB: outputGainDB,
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
@@ -496,6 +511,8 @@ final class AppState: ObservableObject {
         limiterCeilingDB = -1
         crossfeedEnabled = false
         crossfeedLevelDB = -6
+        loudnessEnabled = false
+        loudnessReferencePercent = 100
         maxBoostPercent = 200
         excludedBundleIDs = ["com.apple.garageband10", "us.zoom.xos"]
         bufferFrames = 256
@@ -580,8 +597,8 @@ final class AppState: ObservableObject {
     func previewVolumeAdjustment(_ percent: Double) {
         guard !Self.screenshotMode else { return }
         let outputGainDB = softwareGainDB(for: percent)
-        if !outputGainDB.isApproximatelyEqual(to: lastPushedSoftwareGainDB) {
-            pushToProcessor(outputGainDB: outputGainDB)
+        if loudnessEnabled || !outputGainDB.isApproximatelyEqual(to: lastPushedSoftwareGainDB) {
+            pushToProcessor(outputGainDB: outputGainDB, volumePercent: percent)
         }
         pushHardwareVolume(percent)
     }
@@ -602,7 +619,7 @@ final class AppState: ObservableObject {
     private func applySoftwareGain() {
         guard !Self.screenshotMode else { return }
         let outputGainDB = softwareGainDB
-        if !outputGainDB.isApproximatelyEqual(to: lastPushedSoftwareGainDB) {
+        if loudnessEnabled || !outputGainDB.isApproximatelyEqual(to: lastPushedSoftwareGainDB) {
             pushToProcessor()
         }
     }

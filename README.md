@@ -37,6 +37,7 @@ Version 1.2.4 therefore starts a new signing chain with a backed-up key and a se
 - Imports every headphone EQ format I could find: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac. Drop a file, paste text, or search the peqdb and AutoEq databases from inside the app.
 - Per-device profiles. Your headphone preset kicks in when the headphones connect; your speakers keep theirs.
 - Volume boost up to 200%, automatic preamp so boosted EQ doesn't clip, a limiter as a safety net, A/B compare, one-click bypass.
+- Loudness compensation: raises bass and treble as you turn the volume down below a reference level you set, following the equal-loudness contours, so quiet listening keeps its balance.
 - Crossfeed for headphones: blends a little low-passed, delayed signal from each channel into the other, so hard-panned recordings sound less split. Toggle it from the popover; the amount is in Settings.
 - An exclude list for apps that handle their own audio (DAWs, Zoom).
 - Global hotkeys for toggling EQ and cycling output devices. Launch at login. That's it — one popover, one editor window, one settings window.
