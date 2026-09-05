@@ -321,7 +321,10 @@ enum TestRunner {
             gainProc.process(channels: [buf.baseAddress!], frameCount: 512)
         }
         expect(abs(dc[100] - 0.5) < 0.01, "processor applies preamp gain")
-        expect(abs(gainProc.currentPeak - 0.5) < 0.01, "active peak meter reports processed level")
+        // The meter reads true peak, and the step from silence to DC
+        // reconstructs with a little overshoot.
+        let meterPeak = gainProc.currentPeak
+        expect(meterPeak > 0.49 && meterPeak < 0.58, "active peak meter reports processed level (\(meterPeak))")
         expect(gainProc.currentPeak == 0, "reading peak meter resets it")
 
         gainProc.setMeteringActive(false)
@@ -386,6 +389,52 @@ enum TestRunner {
         }
         let ceiling = pow(10, Float(-1.0) / 20) * 1.05
         expect(sine[2400...].map(abs).max()! <= ceiling, "limiter caps output at ceiling")
+
+        // True peak: a sine at fs/4 sampled at 45° has sample peaks of 0.707
+        // but a reconstructed peak of 1.0. The estimator must see it, and the
+        // limiter must act on it rather than on the samples.
+        var estimator = TruePeakEstimator(channels: 1)
+        var estimate: Float = 0
+        for n in 0..<200 {
+            estimate = max(estimate, estimator.push(Float(sin(Double(n) * .pi / 2 + .pi / 4)), channel: 0))
+            estimator.advance()
+        }
+        expect(estimate > 0.98 && estimate < 1.02, "true-peak estimator reconstructs inter-sample peak (\(estimate))")
+        let tpProc = EQProcessor()
+        tpProc.configure(sampleRate: 48000)
+        tpProc.update(bands: [], preampDB: 0, limiterEnabled: true, limiterCeilingDB: -1, bypassed: false)
+        var quarter = (0..<4800).map { Float(sin(Double($0) * .pi / 2 + .pi / 4)) }
+        quarter.withUnsafeMutableBufferPointer { buf in
+            tpProc.process(channels: [buf.baseAddress!], frameCount: 4800)
+        }
+        let samplePeak = quarter[2400...].map(abs).max()!
+        expect(samplePeak < 0.707 * 0.9, "limiter holds true peak at the ceiling, so sample peaks sit below it (\(samplePeak))")
+
+        // Loudness-matched bypass: +6 dB peak at 1 kHz with a -6 dB preamp is
+        // unity on a 1 kHz tone; plain bypass would be -6 dB, matched bypass
+        // measures the bands' gain and gives it back.
+        let matchProc = EQProcessor()
+        matchProc.configure(sampleRate: 48000)
+        let matchBands = [EQBand(type: .peak, frequency: 1000, gain: 6, q: 1.41)]
+        matchProc.update(bands: matchBands, preampDB: -6, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false)
+        var learn = (0..<(48000 * 6)).map { Float(0.5 * sin(Double($0) * 2 * .pi * 1000 / 48000)) }
+        learn.withUnsafeMutableBufferPointer { buf in
+            matchProc.process(channels: [buf.baseAddress!], frameCount: buf.count)
+        }
+        matchProc.update(bands: matchBands, preampDB: -6, limiterEnabled: false, limiterCeilingDB: -1,
+                         bypassed: true, matchBypassLoudness: true)
+        var ab = (0..<9600).map { Float(0.5 * sin(Double($0) * 2 * .pi * 1000 / 48000)) }
+        ab.withUnsafeMutableBufferPointer { buf in
+            matchProc.process(channels: [buf.baseAddress!], frameCount: buf.count)
+        }
+        let matchedPeak = ab[4800...].map(abs).max()!
+        expect(abs(matchedPeak - 0.5) < 0.03, "loudness-matched bypass restores the bands' level (\(matchedPeak))")
+        expect(abs(matchProc.bypassMatchDB - 6) < 0.5, "bypass match gain is published for spectrum alignment (\(matchProc.bypassMatchDB))")
+        matchProc.update(bands: matchBands, preampDB: -6, limiterEnabled: false, limiterCeilingDB: -1, bypassed: true)
+        ab.withUnsafeMutableBufferPointer { buf in
+            matchProc.process(channels: [buf.baseAddress!], frameCount: buf.count)
+        }
+        expect(abs(ab[4800...].map(abs).max()! - 0.25) < 0.02, "plain bypass (EQ off) applies no match gain")
 
         let alignProc = EQProcessor()
         alignProc.configure(sampleRate: 48000)
