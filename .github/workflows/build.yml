@@ -18,6 +18,13 @@ jobs:
           path: .build
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
 
+      - name: Resolve packages
+        # The Sparkle binary artifact is downloaded with a quarantine flag,
+        # and Gatekeeper kills any process that loads a quarantined dylib.
+        run: |
+          swift package resolve
+          xattr -dr com.apple.quarantine .build/artifacts || true
+
       - name: Run self-tests
         run: swift run OnlyEQ --test
 
