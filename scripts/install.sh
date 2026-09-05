@@ -3,10 +3,10 @@
 # and clears the quarantine flag (the app is ad-hoc signed, not notarized,
 # so this avoids the "unidentified developer" Gatekeeper block).
 #
-#   curl -fsSL https://raw.githubusercontent.com/zollans/OnlyEQ/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/maltemoeser/OnlyEQ/main/scripts/install.sh | bash
 set -euo pipefail
 
-REPO="zollans/OnlyEQ"
+REPO="maltemoeser/OnlyEQ"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
