@@ -117,11 +117,13 @@ final class EQProcessor {
             os_unfair_lock_unlock(&lock)
         }
         let snap = snapshot
-        // Bypass skips the EQ (preamp + bands) but keeps the output gain and
-        // limiter: on devices without hardware volume the output gain is the
-        // volume control, and dropping it would jump to full level.
+        // Bypass skips only the filter bands. The preamp stays so A/B listening
+        // is level-matched (a -6 dB preamp compensating +6 dB boosts would
+        // otherwise make bypass jump 6 dB louder), and the output gain and
+        // limiter stay because on devices without hardware volume the output
+        // gain is the volume control.
         let applyEQ = !snap.bypassed
-        let preampLinear: Float = applyEQ ? snap.preampLinear : 1
+        let preampLinear = snap.preampLinear
 
         let channelCount = channels.count
         let bandCount = snap.coefficients.count
