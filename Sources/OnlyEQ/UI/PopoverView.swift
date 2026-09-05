@@ -164,9 +164,11 @@ struct PopoverView: View {
                 .menuIndicator(.hidden)
                 .frame(maxWidth: 210)
                 .fixedSize(horizontal: false, vertical: true)
-                Button("Flat") { state.applyFlat() }
+                Toggle("Bypass", isOn: $state.bypassed)
+                    .toggleStyle(.button)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .help("Hear the unprocessed signal without changing the selected preset")
             }
         }
     }
@@ -286,6 +288,7 @@ struct PopoverView: View {
         switch state.engineState {
         case .running:
             if state.suspectedPermissionIssue { return "Waiting for audio" }
+            if state.bypassed { return "Bypassed" }
             return showLatency ? "Active · \(state.latencyMilliseconds) ms" : "Active"
         case .stopped: return "Inactive"
         case .failed: return "Error"
