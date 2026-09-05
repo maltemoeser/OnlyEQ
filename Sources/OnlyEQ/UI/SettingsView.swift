@@ -10,6 +10,8 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             DeviceSettings()
                 .tabItem { Label("Devices", systemImage: "headphones") }
+            SoundSettings()
+                .tabItem { Label("Sound", systemImage: "waveform") }
             ShortcutSettings()
                 .tabItem { Label("Shortcuts", systemImage: "command") }
             AdvancedSettings()
@@ -235,24 +237,13 @@ struct ShortcutSettings: View {
     }
 }
 
-// MARK: - Advanced
+// MARK: - Sound
 
-struct AdvancedSettings: View {
+struct SoundSettings: View {
     @EnvironmentObject var state: AppState
-    @State private var confirmReset = false
 
     var body: some View {
         Form {
-            Picker(selection: $state.bufferFrames) {
-                Text("128 frames").tag(128)
-                Text("256 frames").tag(256)
-                Text("512 frames").tag(512)
-                Text("1024 frames").tag(1024)
-            } label: {
-                Text("Buffer Size")
-                Text("Larger = more stable, more latency. Current latency ≈ \(state.latencyMilliseconds) ms.")
-            }
-
             Section {
                 Toggle(isOn: $state.limiterEnabled) {
                     Text("Limiter")
@@ -306,6 +297,29 @@ struct AdvancedSettings: View {
                         Text("Your normal listening level. No compensation is applied at or above it.")
                     }
                 }
+            }
+
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Advanced
+
+struct AdvancedSettings: View {
+    @EnvironmentObject var state: AppState
+    @State private var confirmReset = false
+
+    var body: some View {
+        Form {
+            Picker(selection: $state.bufferFrames) {
+                Text("128 frames").tag(128)
+                Text("256 frames").tag(256)
+                Text("512 frames").tag(512)
+                Text("1024 frames").tag(1024)
+            } label: {
+                Text("Buffer Size")
+                Text("Larger = more stable, more latency. Current latency ≈ \(state.latencyMilliseconds) ms.")
             }
 
             Picker(selection: $state.maxBoostPercent) {
