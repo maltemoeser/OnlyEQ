@@ -9,6 +9,17 @@ final class SpectrumAnalyzer {
     private static let fftSize = 2048
     private static let analysisReuseInterval = 1.0 / 30.0
 
+    /// Display tilt in dB per octave, pivoted at 1 kHz. Commercial recordings
+    /// decay at about 5 dB/octave in power spectral density (Pestana et al.,
+    /// AES 135, 2013). Constant-Q bands already absorb the 3 dB/octave of
+    /// pink noise, so 2 dB/octave is what makes typical music read flat.
+    static let tiltDBPerOctave: Float = 2
+    /// Detector time constants on band power: quick attack so transients
+    /// register, slow release so the display does not flicker. A 400 ms
+    /// release decays about 11 dB/s, between IEC 61672's F and S weightings.
+    private static let attackTau = 0.010
+    private static let releaseTau = 0.400
+
     private struct RingState {
         var samples = [Float](repeating: 0, count: SpectrumAnalyzer.fftSize)
         var writeIndex = 0
@@ -32,8 +43,10 @@ final class SpectrumAnalyzer {
     private var windowed: [Float]
     private var real: [Float]
     private var imag: [Float]
-    private var magnitudes: [Float]
+    private var powers: [Float]
     private var barsOut: [Float]
+    private var smoothedPower: [Float]
+    private let tilt: [Float]
     private var binRanges: [(lo: Int, hi: Int)] = []
     private var analyzedGeneration: UInt64 = .max
     private var lastAnalysisTime: TimeInterval = 0
@@ -47,8 +60,12 @@ final class SpectrumAnalyzer {
         windowed = [Float](repeating: 0, count: n)
         real = [Float](repeating: 0, count: n / 2)
         imag = [Float](repeating: 0, count: n / 2)
-        magnitudes = [Float](repeating: 0, count: n / 2)
+        powers = [Float](repeating: 0, count: n / 2)
         barsOut = [Float](repeating: 0, count: Self.barCount)
+        smoothedPower = [Float](repeating: 0, count: Self.barCount)
+        tilt = (0..<Self.barCount).map { bar in
+            Self.tiltDBPerOctave * log2(Self.barCenterHz(bar) / 1000)
+        }
         rebuildBinRanges()
     }
 
@@ -76,6 +93,9 @@ final class SpectrumAnalyzer {
         if changed {
             barsOut.withUnsafeMutableBufferPointer { bars in
                 bars.initialize(repeating: 0)
+            }
+            smoothedPower.withUnsafeMutableBufferPointer { levels in
+                levels.initialize(repeating: 0)
             }
             analyzedGeneration = .max
             lastAnalysisTime = 0
@@ -114,14 +134,16 @@ final class SpectrumAnalyzer {
         }
     }
 
-    /// UI thread: 0…1 magnitudes for `barCount` log-spaced bands, 20 Hz – 20 kHz.
-    func bars() -> [Float] {
+    /// UI thread: 0…1 levels for `barCount` log-spaced bands, 20 Hz – 20 kHz.
+    /// Each bar is the band's power (a full-scale sine reads 0 dBFS), tilted
+    /// by `tiltDBPerOctave`, run through the attack/release detector, and
+    /// mapped -60…0 dB → 0…1. `now` is injectable for tests.
+    func bars(now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> [Float] {
         guard let fftSetup else { return [] }
 
         // Popover and editor consumers can fire in the same display cycle. A
         // short global cache lets both share one 30 Hz FFT result while their
         // presentation layers animate independently.
-        let now = ProcessInfo.processInfo.systemUptime
         if now - lastAnalysisTime < Self.analysisReuseInterval { return barsOut }
 
         let n = Self.fftSize
@@ -144,34 +166,55 @@ final class SpectrumAnalyzer {
             }
             return generation
         }
-        guard generation != analyzedGeneration else { return barsOut }
+        // Unchanged ring: skip the FFT but keep the detector releasing toward
+        // the last measured powers so the display settles instead of freezing.
+        if generation != analyzedGeneration {
+            vDSP_vmul(timeDomain, 1, window, 1, &windowed, 1, vDSP_Length(n))
 
-        vDSP_vmul(timeDomain, 1, window, 1, &windowed, 1, vDSP_Length(n))
-
-        real.withUnsafeMutableBufferPointer { rp in
-            imag.withUnsafeMutableBufferPointer { ip in
-                var split = DSPSplitComplex(realp: rp.baseAddress!, imagp: ip.baseAddress!)
-                windowed.withUnsafeBytes { raw in
-                    raw.baseAddress!.assumingMemoryBound(to: DSPComplex.self).withMemoryRebound(to: DSPComplex.self, capacity: n / 2) { complexPtr in
-                        vDSP_ctoz(complexPtr, 2, &split, 1, vDSP_Length(n / 2))
+            real.withUnsafeMutableBufferPointer { rp in
+                imag.withUnsafeMutableBufferPointer { ip in
+                    var split = DSPSplitComplex(realp: rp.baseAddress!, imagp: ip.baseAddress!)
+                    windowed.withUnsafeBytes { raw in
+                        raw.baseAddress!.assumingMemoryBound(to: DSPComplex.self).withMemoryRebound(to: DSPComplex.self, capacity: n / 2) { complexPtr in
+                            vDSP_ctoz(complexPtr, 2, &split, 1, vDSP_Length(n / 2))
+                        }
                     }
+                    fftSetup.forward(input: split, output: &split)
+                    vDSP_zvmags(&split, 1, &powers, 1, vDSP_Length(n / 2))
                 }
-                fftSetup.forward(input: split, output: &split)
-                vDSP_zvabs(&split, 1, &magnitudes, 1, vDSP_Length(n / 2))
             }
         }
 
+        // The ring starts cleared on activation, so the first analysis snaps.
+        let elapsed = lastAnalysisTime == 0 ? 10.0 : min(now - lastAnalysisTime, 10.0)
+        let attack = Float(1 - exp(-elapsed / Self.attackTau))
+        let release = Float(1 - exp(-elapsed / Self.releaseTau))
+        // With the normalized Hann window and vDSP's real-FFT scaling, the
+        // summed bin power over a band divided by n² is the band's mean-square
+        // times two, so a full-scale sine lands at 0 dBFS.
+        let powerScale = 1 / (Float(n) * Float(n))
         for bar in 0..<Self.barCount {
             let range = binRanges[bar]
-            var peak: Float = 0
-            for bin in range.lo...range.hi { peak = max(peak, magnitudes[bin]) }
-            // Map to dBFS, normalized -60…0 dB → 0…1.
-            let db = 20 * log10(max(peak / Float(n), 1e-9))
+            var sum: Float = 0
+            powers.withUnsafeBufferPointer { p in
+                vDSP_sve(p.baseAddress! + range.lo, 1, &sum, vDSP_Length(range.hi - range.lo + 1))
+            }
+            let power = sum * powerScale
+            let previous = smoothedPower[bar]
+            let level = previous + (power - previous) * (power > previous ? attack : release)
+            smoothedPower[bar] = level
+            let db = 10 * log10(max(level, 1e-12)) + tilt[bar]
             barsOut[bar] = min(max((db + 60) / 60, 0), 1)
         }
         analyzedGeneration = generation
         lastAnalysisTime = now
         return barsOut
+    }
+
+    /// Geometric centre of a bar's band.
+    static func barCenterHz(_ bar: Int) -> Float {
+        let logLo = log10(Float(20)), logHi = log10(Float(20000))
+        return pow(10, logLo + (logHi - logLo) * (Float(bar) + 0.5) / Float(Self.barCount))
     }
 
     private func rebuildBinRanges() {
