@@ -370,7 +370,8 @@ enum TestRunner {
         bypassed.withUnsafeMutableBufferPointer { buf in
             bypassProc.process(channels: [buf.baseAddress!], frameCount: 512)
         }
-        expect(abs(bypassed[100] - 0.5) < 0.01, "bypass keeps output gain but skips preamp and bands")
+        // -6 dB preamp and -6.02 dB output gain both stay: 1.0 → 0.25.
+        expect(abs(bypassed[100] - 0.25) < 0.01, "bypass keeps preamp and output gain, skips bands only")
 
         crossfeedTests()
         loudnessTests()
