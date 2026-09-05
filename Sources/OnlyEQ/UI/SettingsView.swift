@@ -287,6 +287,27 @@ struct AdvancedSettings: View {
                 }
             }
 
+            Section {
+                Toggle(isOn: $state.loudnessEnabled) {
+                    Text("Loudness compensation")
+                    Text("Raise bass and treble as the volume drops below your reference level, so quiet listening keeps its balance.")
+                }
+                if state.loudnessEnabled {
+                    LabeledContent {
+                        HStack {
+                            Text("\(Int(state.loudnessReferencePercent))%")
+                                .font(.system(size: 11).monospacedDigit())
+                            Button("Use Current Volume") {
+                                state.loudnessReferencePercent = state.volumePercent
+                            }
+                        }
+                    } label: {
+                        Text("Reference volume")
+                        Text("Your normal listening level. No compensation is applied at or above it.")
+                    }
+                }
+            }
+
             Picker(selection: $state.maxBoostPercent) {
                 Text("100% (no boost)").tag(100.0)
                 Text("150%").tag(150.0)

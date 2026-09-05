@@ -199,6 +199,22 @@ enum TestRunner {
         }
     }
 
+    private static func loudnessTests() {
+        expect(LoudnessCompensation.bands(volumePercent: 100, referencePercent: 100).isEmpty,
+               "no loudness compensation at the reference level")
+        expect(LoudnessCompensation.bands(volumePercent: 150, referencePercent: 100).isEmpty,
+               "no loudness compensation above the reference level")
+        // 20 dB below reference: 6 dB bass shelf, 2 dB treble shelf.
+        let quiet = LoudnessCompensation.bands(volumePercent: 10, referencePercent: 100)
+        expect(quiet.count == 2 && quiet[0].type == .lowShelf && quiet[1].type == .highShelf, "loudness adds two shelves")
+        expect(near(quiet[0].gain, 6, 0.05) && near(quiet[1].gain, 2, 0.05), "loudness scales with attenuation")
+        let floor = LoudnessCompensation.bands(volumePercent: 1, referencePercent: 200)
+        expect(floor[0].gain == 12 && floor[1].gain == 4, "loudness boost is capped")
+        // Reference is relative: same ratio, same shelves.
+        expect(LoudnessCompensation.bands(volumePercent: 30, referencePercent: 60)
+               == LoudnessCompensation.bands(volumePercent: 50, referencePercent: 100), "loudness depends on the ratio to reference")
+    }
+
     private static func crossfeedTests() {
         func run(levelDB: Double, hz: Double, left: Float, right: Float) -> (left: Float, right: Float) {
             let proc = EQProcessor()
@@ -315,6 +331,7 @@ enum TestRunner {
         expect(abs(bypassed[100] - 0.5) < 0.01, "bypass keeps output gain but skips preamp and bands")
 
         crossfeedTests()
+        loudnessTests()
 
         let limProc = EQProcessor()
         limProc.configure(sampleRate: 48000)
