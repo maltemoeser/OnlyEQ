@@ -20,7 +20,7 @@ This is a fork of [zollans/OnlyEQ](https://github.com/zollans/OnlyEQ). Everythin
 - **Loudness compensation** following the ISO 226 equal-loudness contours: low and high shelves grow as the volume drops below a reference level you set, and the preamp absorbs the boost so nothing clips.
 - **Settings inside the editor.** The gear in the editor toolbar or popover switches the editor window to a Settings pane; there is no separate settings window.
 - **Releases from GitHub Actions.** Every push runs the self-tests and builds the universal app in release mode. Pushing a `v*` tag signs the archive with this fork's Sparkle key and publishes it with its appcast as a GitHub Release, which installed copies pick up automatically. Upstream's feed is no longer used, so an upstream release can never replace a fork build.
-- **Input and output spectrum.** The analyser draws the pre-EQ signal in grey behind the post-EQ signal in the accent colour, level-aligned for preamp and output gain, so the EQ's effect is visible on real music.
+- **Input and output spectrum.** The analyser draws the pre-EQ signal in grey behind the post-EQ signal in the accent colour, level-aligned for preamp and output gain, so the EQ's effect is visible on real music. Bars show band power (a full-scale sine reads 0 dBFS), tilted 2 dB per octave so typical music reads flat instead of bass-heavy, with a 10 ms attack and 400 ms release so transients register without flicker.
 - **Simpler controls.** The popover has one preset row with Bypass and Crossfeed side by side, a curve that flattens while bypassed, and a gear menu holding Settings, Check for Updates, and Quit. The right-click menu offers the same items. The editor's Reset-to-flat button is replaced by Revert, which restores the saved preset, and the output-device picker lives only in the popover. Settings gains a Sound tab for the limiter, crossfeed, and loudness.
 - **Matched biquads.** Filters use Vicanek's matched second-order design instead of the bilinear transform, so peaks and shelves near 20 kHz keep their intended shape and a preset measures the same at 44.1 kHz and 96 kHz.
 
@@ -62,7 +62,7 @@ OnlyEQ checks for signed updates automatically and installs them in the backgrou
   <img src="docs/screenshots/editor.png" width="760" alt="OnlyEQ parametric editor">
 </p>
 
-- Live spectrum behind the curve: the untouched input in grey, the processed output in blue, so boosts and cuts show against what came in.
+- Live spectrum behind the curve: the untouched input in grey, the processed output in blue, so boosts and cuts show against what came in. Tilted so music reads flat, with meter-style attack and release.
 - Parametric EQ with a draggable curve editor. Peak, shelves, high/low pass, notch, band pass — as many bands as you want.
 - Imports every headphone EQ format I could find: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac. Drop a file, paste text, or search the peqdb and AutoEq databases from inside the app. Anything you apply is saved and stays in the preset picker.
 - Per-device profiles. Your headphone preset kicks in when the headphones connect; your speakers keep theirs.

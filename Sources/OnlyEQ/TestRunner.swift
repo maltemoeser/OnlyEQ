@@ -401,11 +401,26 @@ enum TestRunner {
         tone.withUnsafeMutableBufferPointer { buffer in
             analyzer.push(channels: [buffer.baseAddress!], frameCount: buffer.count)
         }
-        let bars = analyzer.bars()
+        let t0: TimeInterval = 100
+        let bars = analyzer.bars(now: t0)
         let dominantBar = bars.indices.max(by: { bars[$0] < bars[$1] })
         expect(bars.count == SpectrumAnalyzer.barCount, "spectrum emits configured bar count")
         expect((26...28).contains(dominantBar ?? -1), "spectrum places 1 kHz tone in expected log band")
-        expect(bars.max() ?? 0 > 0.5, "spectrum reports an audible tone")
+        expect(bars.max() ?? 0 > 0.98, "full-scale sine reads 0 dBFS after window and FFT calibration")
+        expect(abs(SpectrumAnalyzer.tiltDBPerOctave * log2(SpectrumAnalyzer.barCenterHz(27) / 1000)) < 0.5,
+               "tilt pivots at 1 kHz")
+        let tiltTop = SpectrumAnalyzer.tiltDBPerOctave * log2(SpectrumAnalyzer.barCenterHz(47) / 1000)
+        expect(tiltTop > 8 && tiltTop < 9, "top bar (about 18.6 kHz) is tilted up by 2 dB per octave above 1 kHz")
+
+        var silence = [Float](repeating: 0, count: 2048)
+        silence.withUnsafeMutableBufferPointer { buffer in
+            analyzer.push(channels: [buffer.baseAddress!], frameCount: buffer.count)
+        }
+        let dominant = dominantBar ?? 27
+        let shortly = analyzer.bars(now: t0 + 0.05)[dominant]
+        expect(shortly > 0.95 && shortly < bars[dominant],
+               "silence after a tone releases slowly (\(shortly))")
+        expect(analyzer.bars(now: t0 + 8)[dominant] < 0.01, "silence fully decays within seconds")
 
         analyzer.setActive(false)
         analyzer.setActive(true)
