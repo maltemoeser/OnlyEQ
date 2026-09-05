@@ -30,6 +30,7 @@ enum TestRunner {
             textEditingShortcutTests()
             dspTests()
             watchdogTests()
+            revertTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -412,6 +413,28 @@ enum TestRunner {
         expect(HeadphoneNameMatcher.score(query: "WH-1000XM5", candidate: "Sony WH-1000XM5")
                > HeadphoneNameMatcher.score(query: "WH-1000XM5", candidate: "Sony WH-1000XM4"),
                "headphone matcher prioritizes exact model number")
+    }
+
+    /// Revert returns the working preset to its stored version and is only
+    /// offered while the two differ.
+    private static func revertTests() {
+        MainActor.assumeIsolated {
+            AppState.screenshotMode = true  // no engine, no persistence
+            let state = AppState.shared
+            let saved = state.store.save(EQPreset(
+                name: "Revert Test",
+                bands: [EQBand(type: .peak, frequency: 1000, gain: 3, q: 1)]))
+            state.apply(saved)
+            expect(!state.presetIsModified, "freshly applied preset is not modified")
+            state.preset.bands[0].gain = 6
+            expect(state.presetIsModified, "edited band marks preset modified")
+            state.revertPreset()
+            expect(state.preset.bands[0].gain == 3, "revert restores the stored band gain")
+            expect(state.preset.id == saved.id, "revert keeps the preset id")
+            state.store.delete(saved)
+            state.apply(.flat)
+            expect(!state.presetIsModified, "built-in preset with no edits is not modified")
+        }
     }
 
     /// Every objectWillChange re-layouts each alive (hidden) window's SwiftUI

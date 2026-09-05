@@ -497,6 +497,21 @@ final class AppState: ObservableObject {
 
     func applyFlat() { apply(.flat) }
 
+    /// The stored preset the working preset came from, if it still exists.
+    var savedPreset: EQPreset? { store.allPresets.first { $0.id == preset.id } }
+
+    /// True while the working preset differs from its stored version.
+    var presetIsModified: Bool {
+        guard let saved = savedPreset else { return false }
+        return saved != preset
+    }
+
+    /// Discard unsaved edits and return to the stored version of the preset.
+    func revertPreset() {
+        guard let saved = savedPreset else { return }
+        apply(saved)
+    }
+
     /// "Reset Everything" in Settings: presets, device profiles, working
     /// state, and every preference back to first-launch defaults.
     func resetToDefaults() {

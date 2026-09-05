@@ -185,51 +185,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if wasVisible { Log.write("menu-panel: hidden") }
     }
 
+    /// Right-click menu. Mirrors the gear menu in the popover so both entry
+    /// points offer the same items.
     private func showContextMenu() {
         hideMenuPanel()
         let state = AppState.shared
         let menu = NSMenu()
 
-        let statusLine = NSMenuItem(title: state.isEnabled ? "OnlyEQ: Active" : "OnlyEQ: Inactive", action: nil, keyEquivalent: "")
-        statusLine.isEnabled = false
-        menu.addItem(statusLine)
-        menu.addItem(.separator())
-
         let enable = NSMenuItem(title: "Enable EQ", action: #selector(toggleEnabled), keyEquivalent: "")
         enable.target = self
         enable.state = state.isEnabled ? .on : .off
         menu.addItem(enable)
-        menu.addItem(.separator())
-
-        // Preset submenu.
-        let presetItem = NSMenuItem(title: "Preset", action: nil, keyEquivalent: "")
-        let presetMenu = NSMenu()
-        for preset in state.store.allPresets {
-            let item = NSMenuItem(title: preset.name, action: #selector(selectPreset(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = preset.id
-            item.state = preset.id == state.preset.id ? .on : .off
-            presetMenu.addItem(item)
-        }
-        presetMenu.addItem(.separator())
-        let importItem = NSMenuItem(title: "Import…", action: #selector(openImport), keyEquivalent: "")
-        importItem.target = self
-        presetMenu.addItem(importItem)
-        presetItem.submenu = presetMenu
-        menu.addItem(presetItem)
-
-        // Output device submenu.
-        let deviceItem = NSMenuItem(title: "Output Device", action: nil, keyEquivalent: "")
-        let deviceMenu = NSMenu()
-        for device in state.devices {
-            let item = NSMenuItem(title: device.name, action: #selector(selectDevice(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = device.id
-            item.state = device.id == state.currentDevice?.id ? .on : .off
-            deviceMenu.addItem(item)
-        }
-        deviceItem.submenu = deviceMenu
-        menu.addItem(deviceItem)
         menu.addItem(.separator())
 
         let editor = NSMenuItem(title: "Open Editor…", action: #selector(openEditor), keyEquivalent: "")
@@ -252,23 +218,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Menu actions
 
     @objc private func toggleEnabled() { AppState.shared.isEnabled.toggle() }
-
-    @objc private func selectPreset(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID,
-              let preset = AppState.shared.store.preset(withID: id) else { return }
-        AppState.shared.apply(preset)
-    }
-
-    @objc private func selectDevice(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? AudioObjectID,
-              let device = AppState.shared.devices.first(where: { $0.id == id }) else { return }
-        AppState.shared.selectOutputDevice(device)
-    }
-
     @objc private func openEditor() { WindowManager.shared.showEditor() }
-    @objc private func openImport() { WindowManager.shared.showEditor(importing: true) }
     @objc private func openSettings() { WindowManager.shared.showSettings() }
-    @objc private func checkForUpdates() { updaterController.checkForUpdates(nil) }
+    @objc func checkForUpdates() { updaterController.checkForUpdates(nil) }
 }
 
 private extension Notification.Name {

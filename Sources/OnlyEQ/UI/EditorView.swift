@@ -66,14 +66,16 @@ struct EditorView: View {
             }
             .frame(maxWidth: 220)
 
-            Button {
+            Button("Save…") {
                 saveName = state.preset.name
                 showSaveSheet = true
-            } label: {
-                Image(systemName: "square.and.arrow.down.on.square")
             }
             .keyboardShortcut("s", modifiers: .command)
-            .help("Save as preset")
+            .help("Save the current curve as a preset")
+
+            Button("Revert") { state.revertPreset() }
+                .disabled(!state.presetIsModified)
+                .help("Discard edits and return to the saved preset")
 
             Spacer()
 
@@ -98,15 +100,6 @@ struct EditorView: View {
             } label: {
                 Label("Import…", systemImage: "square.and.arrow.down")
             }
-
-            Menu {
-                ForEach(state.devices) { device in
-                    Button(device.name) { state.selectOutputDevice(device) }
-                }
-            } label: {
-                Text(state.currentDevice?.name ?? "No Device").font(.system(size: 12)).lineLimit(1)
-            }
-            .frame(maxWidth: 180)
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
@@ -142,6 +135,8 @@ struct EditorView: View {
                 }
             )
             .frame(minHeight: 220, maxHeight: .infinity)
+            .opacity(state.bypassed ? 0.45 : 1)
+            .animation(.easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
                 Text("+12 dB").font(.system(size: 9)).foregroundStyle(.secondary).padding(4)
             }
@@ -149,8 +144,13 @@ struct EditorView: View {
                 Text("−12 dB").font(.system(size: 9)).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .topTrailing) {
-                Label("Double-click graph to add band", systemImage: "plus.circle")
-                    .font(.system(size: 10)).foregroundStyle(.tertiary).padding(4)
+                if state.bypassed {
+                    Label("Bypassed", systemImage: "eye.slash")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary).padding(4)
+                } else {
+                    Label("Double-click graph to add band", systemImage: "plus.circle")
+                        .font(.system(size: 10)).foregroundStyle(.tertiary).padding(4)
+                }
             }
             FrequencyAxisLabels()
         }
@@ -234,12 +234,6 @@ struct EditorView: View {
                 .toggleStyle(AccentSwitchStyle(width: 30))
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
-            Button("Reset") {
-                state.applyFlat()
-                selectedBandID = nil
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .layoutPriority(2)
         }
         .controlSize(.small)
         .padding(.horizontal, 24)

@@ -126,15 +126,6 @@ struct PopoverView: View {
     private var presetCard: some View {
         Card {
             HStack(spacing: 8) {
-                Text("Preset").font(.system(size: 12)).foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                if state.presetWasAutoApplied {
-                    Text("auto")
-                        .font(.system(size: 9, weight: .semibold))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.22)))
-                        .foregroundStyle(Color.accentColor)
-                }
                 Menu {
                     ForEach(state.store.allPresets) { preset in
                         Button(preset.name) { state.apply(preset) }
@@ -150,26 +141,27 @@ struct PopoverView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(state.preset.name)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .frame(maxWidth: 210)
                 .fixedSize(horizontal: false, vertical: true)
+                .help(state.presetWasAutoApplied ? "Applied automatically for this device" : "Preset")
+                Spacer(minLength: 8)
                 Toggle("Bypass", isOn: $state.bypassed)
-                    .toggleStyle(.button)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("Hear the unprocessed signal without changing the selected preset")
+                    .help("Hear the unprocessed signal without changing the preset")
+                Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
+                    .help("Blend a little of each channel into the other for headphones")
             }
+            .toggleStyle(.button)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 
@@ -178,38 +170,19 @@ struct PopoverView: View {
     private var curvePreview: some View {
         Card {
             VStack(spacing: 5) {
-                ZStack(alignment: .top) {
-                    EQCurveView(bands: state.preset.bands, preampDB: 0,
-                                showSpectrum: state.isEnabled && state.popoverIsVisible,
-                                spectrumStyle: .subtle)
-                        .frame(height: 116)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    HStack {
-                        Toggle(isOn: $state.crossfeedEnabled) {
-                            Label("Crossfeed", systemImage: "headphones")
-                                .font(.system(size: 10, weight: .medium))
-                        }
-                        .toggleStyle(.button)
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .help("Blend a little of each channel into the other for headphones")
-                        Spacer()
-                        Button {
-                            WindowManager.shared.showEditor()
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                                .font(.system(size: 10, weight: .medium))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                    }
-                    .padding(3)
-                }
+                EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
+                            showSpectrum: state.isEnabled && state.popoverIsVisible,
+                            spectrumStyle: .subtle)
+                    .frame(height: 116)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .opacity(state.bypassed ? 0.5 : 1)
+                    .animation(.easeInOut(duration: 0.15), value: state.bypassed)
                 FrequencyAxisLabels(compact: true)
             }
         }
         .contentShape(Rectangle())
         .onTapGesture { WindowManager.shared.showEditor() }
+        .help("Open the editor")
     }
 
     private var permissionBanner: some View {
@@ -249,12 +222,20 @@ struct PopoverView: View {
                 Label("Editor", systemImage: "slider.horizontal.3")
                     .font(.system(size: 11))
             }
-            Button {
-                WindowManager.shared.showSettings()
+            Menu {
+                Button("Settings…") { WindowManager.shared.showSettings() }
+                Button("Check for Updates…") {
+                    (NSApp.delegate as? AppDelegate)?.checkForUpdates()
+                }
+                Divider()
+                Button("Quit OnlyEQ") { NSApp.terminate(nil) }
             } label: {
                 Image(systemName: "gearshape")
             }
-            .help("Settings")
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Settings, updates, quit")
             Spacer()
             statusIndicator
         }
