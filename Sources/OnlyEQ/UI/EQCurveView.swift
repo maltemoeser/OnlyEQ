@@ -356,7 +356,7 @@ private final class SpectrumBarsNSView: NSView {
             let inputBars = input.bars()
             let outputBars = output.bars()
             // Bars map -60…0 dBFS to 0…1, so a static gain of g dB is g/60.
-            let gainOffset = processor.staticGainDB / 60
+            let gainOffset = (processor.staticGainDB + processor.bypassMatchDB) / 60
             if inputBars.count == targetInput.count, outputBars.count == targetOutput.count {
                 for index in inputBars.indices {
                     targetInput[index] = inputBars[index]

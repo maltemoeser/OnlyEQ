@@ -235,6 +235,7 @@ final class AppState: ObservableObject {
             limiterEnabled: limiterEnabled,
             limiterCeilingDB: limiterCeilingDB,
             bypassed: bypassed || !isEnabled,
+            matchBypassLoudness: bypassed && isEnabled,
             crossfeedEnabled: crossfeedEnabled && isEnabled,
             crossfeedLevelDB: crossfeedLevelDB
         )
