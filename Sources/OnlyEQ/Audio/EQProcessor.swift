@@ -121,7 +121,8 @@ final class EQProcessor {
     func update(bands: [EQBand], preampDB: Double, outputGainDB: Double = 0,
                 limiterEnabled: Bool, limiterCeilingDB: Double, bypassed: Bool,
                 matchBypassLoudness: Bool = false,
-                crossfeedEnabled: Bool = false, crossfeedLevelDB: Double = -6) {
+                crossfeedEnabled: Bool = false, crossfeedLevelDB: Double = -6,
+                crossfeedCutoffHz: Double = CrossfeedPreset.chuMoy.cutoffHz) {
         var snap = Snapshot()
         snap.coefficients = bands.filter(\.isEnabled).map {
             BiquadCoefficients.make(type: $0.type, frequency: $0.frequency, gainDB: $0.gain, q: $0.q, sampleRate: sampleRate)
@@ -134,7 +135,8 @@ final class EQProcessor {
         snap.bypassed = bypassed
         snap.matchBypassLoudness = matchBypassLoudness
         if crossfeedEnabled {
-            snap.crossfeed = CrossfeedParameters.make(levelDB: crossfeedLevelDB, sampleRate: sampleRate)
+            snap.crossfeed = CrossfeedParameters.make(levelDB: crossfeedLevelDB, cutoffHz: crossfeedCutoffHz,
+                                                      sampleRate: sampleRate)
         }
         snap.freshStates = Array(repeating: BiquadState(), count: Self.channelCapacity * snap.coefficients.count)
         os_unfair_lock_lock(&lock)

@@ -57,10 +57,19 @@ final class AppState: ObservableObject {
     @Published var crossfeedEnabled = UserDefaults.standard.bool(forKey: "crossfeed") {
         didSet { UserDefaults.standard.set(crossfeedEnabled, forKey: "crossfeed"); pushToProcessor() }
     }
-    /// Cross level in dB; -6 is a moderate Bauer setting, -3 strong, -9 subtle.
+    @Published var crossfeedPreset = CrossfeedPreset(rawValue: UserDefaults.standard.string(forKey: "crossfeedPreset") ?? "") ?? .chuMoy {
+        didSet { UserDefaults.standard.set(crossfeedPreset.rawValue, forKey: "crossfeedPreset"); pushToProcessor() }
+    }
+    /// Custom cross level in dB; -6 is a moderate Bauer setting, -3 strong, -9 subtle.
     @Published var crossfeedLevelDB = UserDefaults.standard.object(forKey: "crossfeedLevel") as? Double ?? -6.0 {
         didSet { UserDefaults.standard.set(crossfeedLevelDB, forKey: "crossfeedLevel"); pushToProcessor() }
     }
+    /// Custom low-pass corner for the cross signal.
+    @Published var crossfeedCutoffHz = UserDefaults.standard.object(forKey: "crossfeedCutoff") as? Double ?? 700.0 {
+        didSet { UserDefaults.standard.set(crossfeedCutoffHz, forKey: "crossfeedCutoff"); pushToProcessor() }
+    }
+    var effectiveCrossfeedLevelDB: Double { crossfeedPreset == .custom ? crossfeedLevelDB : crossfeedPreset.levelDB }
+    var effectiveCrossfeedCutoffHz: Double { crossfeedPreset == .custom ? crossfeedCutoffHz : crossfeedPreset.cutoffHz }
 
     /// Volume as 0…maxBoost percent. ≤100 uses hardware volume when available;
     /// the portion above 100 % (or everything, for HDMI-style outputs) is software gain.
@@ -237,7 +246,8 @@ final class AppState: ObservableObject {
             bypassed: bypassed || !isEnabled,
             matchBypassLoudness: bypassed && isEnabled,
             crossfeedEnabled: crossfeedEnabled && isEnabled,
-            crossfeedLevelDB: crossfeedLevelDB
+            crossfeedLevelDB: effectiveCrossfeedLevelDB,
+            crossfeedCutoffHz: effectiveCrossfeedCutoffHz
         )
         lastPushedSoftwareGainDB = outputGainDB
     }
@@ -530,7 +540,9 @@ final class AppState: ObservableObject {
         limiterEnabled = true
         limiterCeilingDB = -1
         crossfeedEnabled = false
+        crossfeedPreset = .chuMoy
         crossfeedLevelDB = -6
+        crossfeedCutoffHz = 700
         loudnessEnabled = false
         loudnessReferencePercent = 100
         maxBoostPercent = 200
