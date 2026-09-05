@@ -224,9 +224,6 @@ struct PopoverView: View {
             }
             Menu {
                 Button("Settings…") { WindowManager.shared.showSettings() }
-                Button("Check for Updates…") {
-                    (NSApp.delegate as? AppDelegate)?.checkForUpdates()
-                }
                 Divider()
                 Button("Quit OnlyEQ") { NSApp.terminate(nil) }
             } label: {
@@ -235,7 +232,7 @@ struct PopoverView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Settings, updates, quit")
+            .help("Settings and quit")
             Spacer()
             statusIndicator
         }

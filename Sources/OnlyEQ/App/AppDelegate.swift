@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 import CoreAudio
-import Sparkle
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -11,11 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var workspaceActivationObserver: NSObjectProtocol?
     private var hidePanelObserver: NSObjectProtocol?
     private let appShortcutMonitor = AppShortcutMonitor()
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("app: didFinishLaunching")
@@ -204,9 +198,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
-        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
-        updates.target = self
-        menu.addItem(updates)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit OnlyEQ", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
@@ -220,7 +211,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleEnabled() { AppState.shared.isEnabled.toggle() }
     @objc private func openEditor() { WindowManager.shared.showEditor() }
     @objc private func openSettings() { WindowManager.shared.showSettings() }
-    @objc func checkForUpdates() { updaterController.checkForUpdates(nil) }
 }
 
 private extension Notification.Name {
@@ -240,7 +230,6 @@ final class WindowManager {
     static let shared = WindowManager()
 
     private var editorWindow: NSWindow?
-    private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
 
     func showEditor(importing: Bool = false, profileSuggestion: ProfileSuggestion? = nil) {
@@ -284,21 +273,8 @@ final class WindowManager {
     }
 
     func showSettings() {
-        if settingsWindow == nil {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
-                styleMask: [.titled, .closable],
-                backing: .buffered, defer: false
-            )
-            window.title = "OnlyEQ Settings"
-            window.isReleasedWhenClosed = false
-            window.contentViewController = NSHostingController(
-                rootView: SettingsView().environmentObject(AppState.shared)
-            )
-            window.center()
-            settingsWindow = window
-        }
-        if let settingsWindow { focus(settingsWindow) }
+        AppState.shared.editorShowsSettings = true
+        showEditor()
     }
 
     func showOnboarding() {

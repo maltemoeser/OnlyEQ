@@ -109,6 +109,8 @@ final class AppState: ObservableObject {
     /// gate on these to stop ticking once nothing is visible.
     @Published var popoverIsVisible = false { didSet { updateVisualizationState() } }
     @Published var editorIsVisible = false { didSet { updateVisualizationState() } }
+    /// Settings live in the editor window as a second pane.
+    @Published var editorShowsSettings = false
 
     /// autoPreamp scans a 512-point response curve; during a band drag this is
     /// read ~120×/s with unchanged bands, so memoize on the band values.

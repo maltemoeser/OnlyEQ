@@ -31,9 +31,9 @@
 	<key>SUPublicEDKey</key>
 	<string>r5SvxI0Rl5w0dW4XgJIq/TuAq3m6bHPqpmIyp0aHh/o=</string>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUAutomaticallyUpdate</key>
-	<true/>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

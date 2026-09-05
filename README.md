@@ -18,6 +18,8 @@ This is a fork of [zollans/OnlyEQ](https://github.com/zollans/OnlyEQ). Everythin
 - **Level-matched bypass.** Bypass keeps the preamp, output gain, and limiter active and skips only the filter bands, so an A/B comparison is not decided by the unprocessed side being louder.
 - **Crossfeed** for headphones (Bauer-style: 700 Hz low-pass, 0.3 ms delay, adjustable feed level). Toggle in the popover and the editor, amount in Settings › Sound.
 - **Loudness compensation** following the ISO 226 equal-loudness contours: low and high shelves grow as the volume drops below a reference level you set, and the preamp absorbs the boost so nothing clips.
+- **Settings inside the editor.** The gear in the editor toolbar or popover switches the editor window to a Settings pane; there is no separate settings window.
+- **No Sparkle updates.** Upstream's feed would have silently replaced a fork build with the next upstream release, so the updater is disabled. A GitHub Actions workflow builds every push and attaches a universal `OnlyEQ.app.zip` to a GitHub Release when a `v*` tag is pushed.
 - **Simpler controls.** The popover has one preset row with Bypass and Crossfeed side by side, a curve that flattens while bypassed, and a gear menu holding Settings, Check for Updates, and Quit. The right-click menu offers the same items. The editor's Reset-to-flat button is replaced by Revert, which restores the saved preset, and the output-device picker lives only in the popover. Settings gains a Sound tab for the limiter, crossfeed, and loudness.
 - **Matched biquads.** Filters use Vicanek's matched second-order design instead of the bilinear transform, so peaks and shelves near 20 kHz keep their intended shape and a preset measures the same at 44.1 kHz and 96 kHz.
 
@@ -53,7 +55,7 @@ Requires macOS 14.4 or newer. On first launch it asks for System Audio Recording
 
 OnlyEQ checks for signed updates automatically and installs them in the background. The original Mac that held the Sparkle private key became unavailable before the key was backed up. Versions through 1.2.3 trust that old key, and OnlyEQ is ad-hoc signed rather than Developer ID signed, so Sparkle cannot securely rotate to a replacement key through an automatic update.
 
-Version 1.2.4 therefore starts a new signing chain with a backed-up key and a separate `appcast-v2.xml` feed. Keeping the feeds separate prevents older clients from being offered an archive they cannot verify. Versions through 1.2.3 need one manual installation of 1.2.4; automatic updates resume normally afterward. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately.
+Version 1.2.4 therefore starts a new signing chain with a backed-up key and a separate `appcast-v2.xml` feed. Keeping the feeds separate prevents older clients from being offered an archive they cannot verify. Versions through 1.2.3 need one manual installation of 1.2.4; automatic updates resume normally afterward. This fork disables the updater entirely; see [Changes in this fork](#changes-in-this-fork).
 
 ## What it does
 
