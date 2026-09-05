@@ -245,7 +245,9 @@ final class AppState: ObservableObject {
     /// actually on screen. The editor alone owns the peak meter; either visible
     /// surface can consume spectrum samples.
     private func updateVisualizationState() {
-        engine.spectrum.setActive(isEnabled && (popoverIsVisible || editorIsVisible))
+        let spectrumVisible = isEnabled && (popoverIsVisible || editorIsVisible)
+        engine.spectrum.setActive(spectrumVisible)
+        engine.inputSpectrum.setActive(spectrumVisible)
         engine.processor.setMeteringActive(isEnabled && editorIsVisible)
     }
 

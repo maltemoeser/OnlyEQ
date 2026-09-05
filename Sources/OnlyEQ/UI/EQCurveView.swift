@@ -239,7 +239,9 @@ private struct SpectrumBarsView: NSViewRepresentable {
     var style: EQCurveView.SpectrumStyle
 
     func makeNSView(context: Context) -> SpectrumBarsNSView {
-        let view = SpectrumBarsNSView(spectrum: AppState.shared.engine.spectrum)
+        let engine = AppState.shared.engine
+        let view = SpectrumBarsNSView(input: engine.inputSpectrum, output: engine.spectrum,
+                                      processor: engine.processor)
         view.configure(style: style)
         return view
     }
@@ -253,25 +255,38 @@ private struct SpectrumBarsView: NSViewRepresentable {
     }
 }
 
+/// Draws the pre-EQ spectrum in grey and the processed spectrum in the accent
+/// colour on top. Where the EQ boosts, accent rises above grey; where it cuts,
+/// grey shows above accent. The output bars are shifted by the static gain so
+/// only the filter shape appears as a difference.
 @MainActor
 private final class SpectrumBarsNSView: NSView {
-    private let spectrum: SpectrumAnalyzer
-    private let barsLayer = CAShapeLayer()
+    private let input: SpectrumAnalyzer
+    private let output: SpectrumAnalyzer
+    private let processor: EQProcessor
+    private let inputLayer = CAShapeLayer()
+    private let outputLayer = CAShapeLayer()
     private var animationLink: CADisplayLink?
-    private var targetBars = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
-    private var displayedBars = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
+    private var targetInput = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
+    private var targetOutput = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
+    private var displayedInput = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
+    private var displayedOutput = [Float](repeating: 0, count: SpectrumAnalyzer.barCount)
     private var lastAnalysisTime: CFTimeInterval = 0
     private var barOpacity = 0.10
     private var heightScale = 0.75
     private var configuredStyle: EQCurveView.SpectrumStyle?
 
-    init(spectrum: SpectrumAnalyzer) {
-        self.spectrum = spectrum
+    init(input: SpectrumAnalyzer, output: SpectrumAnalyzer, processor: EQProcessor) {
+        self.input = input
+        self.output = output
+        self.processor = processor
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = true
-        barsLayer.actions = ["path": NSNull(), "fillColor": NSNull(), "bounds": NSNull(), "position": NSNull()]
-        layer?.addSublayer(barsLayer)
+        for shape in [inputLayer, outputLayer] {
+            shape.actions = ["path": NSNull(), "fillColor": NSNull(), "bounds": NSNull(), "position": NSNull()]
+            layer?.addSublayer(shape)
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -295,9 +310,10 @@ private final class SpectrumBarsNSView: NSView {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        barsLayer.frame = bounds
+        inputLayer.frame = bounds
+        outputLayer.frame = bounds
         CATransaction.commit()
-        renderBars(displayedBars)
+        renderBars()
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -312,21 +328,24 @@ private final class SpectrumBarsNSView: NSView {
 
     private func startAnimating() {
         guard animationLink == nil else { return }
-        targetBars.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
-        displayedBars.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
+        for index in targetInput.indices {
+            targetInput[index] = 0; targetOutput[index] = 0
+            displayedInput[index] = 0; displayedOutput[index] = 0
+        }
         lastAnalysisTime = 0
 
         let link = displayLink(target: self, selector: #selector(displayLinkDidFire(_:)))
         DisplayRefreshRate.configure(link, for: window)
         link.add(to: .main, forMode: .common)
         animationLink = link
-        renderBars(displayedBars)
+        renderBars()
     }
 
     private func updateColors() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        barsLayer.fillColor = NSColor.secondaryLabelColor.withAlphaComponent(barOpacity).cgColor
+        inputLayer.fillColor = NSColor.secondaryLabelColor.withAlphaComponent(barOpacity * 1.4).cgColor
+        outputLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(barOpacity * 2.2).cgColor
         CATransaction.commit()
     }
 
@@ -334,9 +353,16 @@ private final class SpectrumBarsNSView: NSView {
         // FFT/magnitude work stays capped at 30 Hz. The layer interpolates the
         // latest targets at the screen refresh rate without multiplying DSP.
         if lastAnalysisTime == 0 || link.timestamp - lastAnalysisTime >= 1.0 / 30.0 {
-            let bars = spectrum.bars()
-            if bars.count == targetBars.count {
-                for index in bars.indices { targetBars[index] = bars[index] }
+            let inputBars = input.bars()
+            let outputBars = output.bars()
+            // Bars map -60…0 dBFS to 0…1, so a static gain of g dB is g/60.
+            let gainOffset = processor.staticGainDB / 60
+            if inputBars.count == targetInput.count, outputBars.count == targetOutput.count {
+                for index in inputBars.indices {
+                    targetInput[index] = inputBars[index]
+                    let raw = outputBars[index]
+                    targetOutput[index] = raw > 0 ? min(max(raw - gainOffset, 0), 1) : 0
+                }
             }
             lastAnalysisTime = link.timestamp
         }
@@ -344,23 +370,36 @@ private final class SpectrumBarsNSView: NSView {
         let duration = max(link.duration, 1.0 / 120.0)
         let blend = Float(1 - exp(-duration / 0.045))
         var changed = false
-        for index in displayedBars.indices {
-            let delta = targetBars[index] - displayedBars[index]
-            if abs(delta) > 0.0005 {
-                displayedBars[index] += delta * blend
-                changed = true
-            } else {
-                displayedBars[index] = targetBars[index]
-            }
-        }
-        if changed { renderBars(displayedBars) }
+        changed = Self.approach(&displayedInput, toward: targetInput, blend: blend) || changed
+        changed = Self.approach(&displayedOutput, toward: targetOutput, blend: blend) || changed
+        if changed { renderBars() }
     }
 
-    private func renderBars(_ bars: [Float]) {
+    private static func approach(_ displayed: inout [Float], toward target: [Float], blend: Float) -> Bool {
+        var changed = false
+        for index in displayed.indices {
+            let delta = target[index] - displayed[index]
+            if abs(delta) > 0.0005 {
+                displayed[index] += delta * blend
+                changed = true
+            } else {
+                displayed[index] = target[index]
+            }
+        }
+        return changed
+    }
+
+    private func renderBars() {
         let size = bounds.size
         guard size.width > 0, size.height > 0 else { return }
-        guard !bars.isEmpty else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        inputLayer.path = path(for: displayedInput, size: size)
+        outputLayer.path = path(for: displayedOutput, size: size)
+        CATransaction.commit()
+    }
 
+    private func path(for bars: [Float], size: CGSize) -> CGPath {
         let barWidth = size.width / CGFloat(bars.count)
         let path = CGMutablePath()
         for (index, level) in bars.enumerated() {
@@ -368,11 +407,7 @@ private final class SpectrumBarsNSView: NSView {
             path.addRect(CGRect(x: CGFloat(index) * barWidth + 1, y: 0,
                                 width: max(barWidth - 2, 1), height: height))
         }
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        barsLayer.path = path
-        CATransaction.commit()
+        return path
     }
 
     deinit {
