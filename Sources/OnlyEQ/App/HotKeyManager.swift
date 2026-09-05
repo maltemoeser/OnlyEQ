@@ -20,7 +20,7 @@ final class HotKeyManager {
             case .toggleEQ: "Toggle EQ"
             case .cycleOutput: "Cycle output device"
             case .nextPreset: "Next preset"
-            case .flat: "Flat / bypass"
+            case .flat: "Bypass EQ"
             }
         }
 
@@ -115,7 +115,8 @@ final class HotKeyManager {
             let idx = all.firstIndex { $0.id == state.preset.id } ?? -1
             state.apply(all[(idx + 1) % all.count])
         case .flat:
-            state.applyFlat()
+            // Case name kept for the persisted "hotkey.flat" defaults key.
+            state.bypassed.toggle()
         }
     }
 }
