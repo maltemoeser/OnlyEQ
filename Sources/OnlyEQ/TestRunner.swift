@@ -258,7 +258,49 @@ enum TestRunner {
         expect(r[255] == 0, "crossfeed is inert when disabled")
     }
 
+    private static func decrampingTests() {
+        // The matched design must track the analog prototype across the band,
+        // including near Nyquist where the bilinear transform cramps.
+        let cases: [(FilterType, Double, Double, Double)] = [
+            (.peak, 10000, 6, 1.41), (.peak, 8800, 5.1, 1.42), (.peak, 5400, -2.3, 3), (.peak, 100, -4, 0.5),
+            (.highShelf, 8000, 4, 0.71), (.highShelf, 10000, -6, 0.71), (.lowShelf, 105, 6.4, 0.7),
+            (.lowPass, 12000, 0, 0.707), (.highPass, 80, 0, 0.707), (.notch, 60, 0, 10), (.bandPass, 1000, 0, 2),
+        ]
+        var worstEQ = 0.0, worstPass = 0.0, worstBilinearEQ = 0.0
+        for (type, fc, gain, q) in cases {
+            let fs = 44100.0
+            let a = pow(10.0, gain / 40.0)
+            let matched = BiquadCoefficients.make(type: type, frequency: fc, gainDB: gain, q: q, sampleRate: fs)
+            let bilinear = BiquadCoefficients.makeBilinear(type: type, w0: 2 * .pi * fc / fs, a: a, q: q)
+            let isEQ = [.peak, .lowShelf, .highShelf].contains(type)
+            for f in EQResponse.logGrid(count: 200) where f < fs * 0.45 {
+                let target = 10 * log10(BiquadCoefficients.analogMagnitudeSquared(type: type, ratio: f / fc, a: a, q: q))
+                guard target > -30 else { continue }  // skip the stop bands of pass filters
+                let error = abs(matched.magnitudeDB(at: f, sampleRate: fs) - target)
+                if isEQ {
+                    worstEQ = max(worstEQ, error)
+                    worstBilinearEQ = max(worstBilinearEQ, abs(bilinear.magnitudeDB(at: f, sampleRate: fs) - target))
+                } else {
+                    worstPass = max(worstPass, error)
+                }
+            }
+        }
+        expect(worstEQ < 0.35, "matched peaks and shelves track the analog target within 0.35 dB (worst \(worstEQ))")
+        expect(worstPass < 1, "matched pass, notch and band-pass filters track within 1 dB (worst \(worstPass))")
+        expect(worstBilinearEQ > 1, "bilinear peaks and shelves cramp near Nyquist (worst \(worstBilinearEQ))")
+        print("  decramping: matched worst \(String(format: "%.3f", worstEQ)) dB, bilinear worst \(String(format: "%.2f", worstBilinearEQ)) dB")
+
+        // Sample-rate independence: the same band at 44.1 and 96 kHz agree.
+        let c44 = BiquadCoefficients.make(type: .peak, frequency: 10000, gainDB: 6, q: 1.41, sampleRate: 44100)
+        let c96 = BiquadCoefficients.make(type: .peak, frequency: 10000, gainDB: 6, q: 1.41, sampleRate: 96000)
+        let drift = [5000.0, 8000, 10000, 14000, 18000].map {
+            abs(c44.magnitudeDB(at: $0, sampleRate: 44100) - c96.magnitudeDB(at: $0, sampleRate: 96000))
+        }.max() ?? 0
+        expect(drift < 0.3, "matched 10 kHz peak agrees across sample rates (drift \(drift))")
+    }
+
     private static func dspTests() {
+        decrampingTests()
         let c = BiquadCoefficients.make(type: .peak, frequency: 1000, gainDB: 6, q: 1.41, sampleRate: 48000)
         expect(near(c.magnitudeDB(at: 1000, sampleRate: 48000), 6, 0.01), "peak magnitude at Fc")
         expect(near(c.magnitudeDB(at: 20, sampleRate: 48000), 0, 0.1), "peak magnitude at 20 Hz")
