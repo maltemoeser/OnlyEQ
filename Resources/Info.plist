@@ -9,9 +9,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.onlyeq.app</string>
 	<key>CFBundleVersion</key>
-	<string>23</string>
+	<string>24</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.7</string>
+	<string>1.3.0</string>
 	<key>CFBundleExecutable</key>
 	<string>OnlyEQ</string>
 	<key>CFBundlePackageType</key>
@@ -27,9 +27,9 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Free and open — no license required.</string>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/zollans/OnlyEQ/main/appcast-v2.xml</string>
+	<string>https://github.com/maltemoeser/OnlyEQ/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>r5SvxI0Rl5w0dW4XgJIq/TuAq3m6bHPqpmIyp0aHh/o=</string>
+	<string>5WJEyVvvS/mkUgy3P9YzvVDZAbJToC74+OTBgAiQrig=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>

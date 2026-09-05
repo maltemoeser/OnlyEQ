@@ -18,6 +18,8 @@ This is a fork of [zollans/OnlyEQ](https://github.com/zollans/OnlyEQ). Everythin
 - **Level-matched bypass.** Bypass keeps the preamp, output gain, and limiter active and skips only the filter bands, so an A/B comparison is not decided by the unprocessed side being louder.
 - **Crossfeed** for headphones (Bauer-style: 700 Hz low-pass, 0.3 ms delay, adjustable feed level). Toggle in the popover and the editor, amount in Settings › Sound.
 - **Loudness compensation** following the ISO 226 equal-loudness contours: low and high shelves grow as the volume drops below a reference level you set, and the preamp absorbs the boost so nothing clips.
+- **Settings inside the editor.** The gear in the editor toolbar or popover switches the editor window to a Settings pane; there is no separate settings window.
+- **Releases from GitHub Actions.** Every push runs the self-tests and builds the universal app in release mode. Pushing a `v*` tag signs the archive with this fork's Sparkle key and publishes it with its appcast as a GitHub Release, which installed copies pick up automatically. Upstream's feed is no longer used, so an upstream release can never replace a fork build.
 - **Simpler controls.** The popover has one preset row with Bypass and Crossfeed side by side, a curve that flattens while bypassed, and a gear menu holding Settings, Check for Updates, and Quit. The right-click menu offers the same items. The editor's Reset-to-flat button is replaced by Revert, which restores the saved preset, and the output-device picker lives only in the popover. Settings gains a Sound tab for the limiter, crossfeed, and loudness.
 - **Matched biquads.** Filters use Vicanek's matched second-order design instead of the bilinear transform, so peaks and shelves near 20 kHz keep their intended shape and a preset measures the same at 44.1 kHz and 96 kHz.
 
@@ -39,21 +41,19 @@ This is a fork of [zollans/OnlyEQ](https://github.com/zollans/OnlyEQ). Everythin
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/zollans/OnlyEQ/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/maltemoeser/OnlyEQ/main/scripts/install.sh | bash
 ```
 
 The app isn't notarized (there's no paid developer account behind this), so the script clears the quarantine flag after downloading — [read it first](scripts/install.sh) if that concerns you. Or build from source, it takes about a minute and only needs the Xcode Command Line Tools:
 
 ```sh
-git clone https://github.com/zollans/OnlyEQ && cd OnlyEQ
+git clone https://github.com/maltemoeser/OnlyEQ && cd OnlyEQ
 ./scripts/build-app.sh && cp -R build/OnlyEQ.app /Applications/
 ```
 
 Requires macOS 14.4 or newer. On first launch it asks for System Audio Recording permission — that's the tap. macOS shows the purple recording indicator while EQ is active; audio never leaves your machine.
 
-OnlyEQ checks for signed updates automatically and installs them in the background. The original Mac that held the Sparkle private key became unavailable before the key was backed up. Versions through 1.2.3 trust that old key, and OnlyEQ is ad-hoc signed rather than Developer ID signed, so Sparkle cannot securely rotate to a replacement key through an automatic update.
-
-Version 1.2.4 therefore starts a new signing chain with a backed-up key and a separate `appcast-v2.xml` feed. Keeping the feeds separate prevents older clients from being offered an archive they cannot verify. Versions through 1.2.3 need one manual installation of 1.2.4; automatic updates resume normally afterward. Right-click the menu-bar icon and choose **Check for Updates…** to check immediately.
+OnlyEQ checks for signed updates automatically and installs them in the background. Updates come from this fork's [GitHub Releases](https://github.com/maltemoeser/OnlyEQ/releases); see [RELEASING.md](RELEASING.md) for how they are built.
 
 ## What it does
 
@@ -95,7 +95,6 @@ swift run OnlyEQ --profile-suggestion-probe # previews Bluetooth profile discove
 swift run OnlyEQ --menu-panel-probe    # previews the arrowless menu panel
 swift run OnlyEQ --screenshots out/   # renders the README screenshots
 ./scripts/build-app.sh release        # universal binary release build
-./scripts/prepare-release.sh 1.2.5    # signed archive + v2 appcast
 ```
 
 Tests run inside the binary because the Command Line Tools don't ship XCTest. Diagnostics land in `~/Library/Logs/OnlyEQ.log`.

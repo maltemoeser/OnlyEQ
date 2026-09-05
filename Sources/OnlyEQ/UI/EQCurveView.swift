@@ -456,23 +456,33 @@ private struct DraggableBandNode: View {
 struct FrequencyAxisLabels: View {
     var compact = false
 
+    private static let compactItems: [(freq: Double, label: String)] = [
+        (20, "20 Hz"), (100, "100 Hz"), (1000, "1 kHz"), (10000, "10 kHz"),
+    ]
+    private static let fullItems: [(freq: Double, label: String)] = [
+        (20, "20 Hz"), (62, "62"), (125, "125"), (250, "250"), (500, "500"),
+        (1000, "1 kHz"), (2000, "2 kHz"), (4000, "4 kHz"), (8000, "8 kHz"), (16000, "16 kHz"),
+    ]
+
     private var items: [(freq: Double, label: String)] {
-        compact
-            ? [(20, "20 Hz"), (100, "100 Hz"), (1000, "1 kHz"), (10000, "10 kHz")]
-            : [(20, "20 Hz"), (62, "62"), (125, "125"), (250, "250"), (500, "500"),
-               (1000, "1 kHz"), (2000, "2 kHz"), (4000, "4 kHz"), (8000, "8 kHz"), (16000, "16 kHz")]
+        compact ? Self.compactItems : Self.fullItems
     }
 
     var body: some View {
         GeometryReader { geo in
             ForEach(items, id: \.label) { item in
-                let x = CGFloat((log10(item.freq) - log10(20.0)) / (log10(20000.0) - log10(20.0))) * geo.size.width
                 Text(item.label)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                    .position(x: min(max(x, 14), geo.size.width - 16), y: geo.size.height / 2)
+                    .position(x: labelX(for: item.freq, width: geo.size.width), y: geo.size.height / 2)
             }
         }
         .frame(height: 12)
+    }
+
+    private func labelX(for freq: Double, width: CGFloat) -> CGFloat {
+        let fraction = (log10(freq) - log10(20.0)) / (log10(20000.0) - log10(20.0))
+        let x = CGFloat(fraction) * width
+        return min(max(x, 14), width - 16)
     }
 }

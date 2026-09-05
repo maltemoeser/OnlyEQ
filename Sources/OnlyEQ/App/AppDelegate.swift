@@ -1,7 +1,7 @@
 import AppKit
+import Sparkle
 import SwiftUI
 import CoreAudio
-import Sparkle
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -240,7 +240,6 @@ final class WindowManager {
     static let shared = WindowManager()
 
     private var editorWindow: NSWindow?
-    private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
 
     func showEditor(importing: Bool = false, profileSuggestion: ProfileSuggestion? = nil) {
@@ -284,21 +283,8 @@ final class WindowManager {
     }
 
     func showSettings() {
-        if settingsWindow == nil {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
-                styleMask: [.titled, .closable],
-                backing: .buffered, defer: false
-            )
-            window.title = "OnlyEQ Settings"
-            window.isReleasedWhenClosed = false
-            window.contentViewController = NSHostingController(
-                rootView: SettingsView().environmentObject(AppState.shared)
-            )
-            window.center()
-            settingsWindow = window
-        }
-        if let settingsWindow { focus(settingsWindow) }
+        AppState.shared.editorShowsSettings = true
+        showEditor()
     }
 
     func showOnboarding() {

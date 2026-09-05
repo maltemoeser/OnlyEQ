@@ -41,7 +41,14 @@ enum ScreenshotRenderer {
             to: dir.appendingPathComponent("import.png")
         ) ? 0 : 1
 
-        print(failures == 0 ? "Saved 3 screenshots to \(dir.path)" : "\(failures) screenshot(s) failed")
+        state.editorShowsSettings = true
+        failures += capture(
+            canvas(windowChrome(EditorView().environmentObject(state).frame(width: 840, height: 540), width: 840), panelRadius: 12),
+            to: dir.appendingPathComponent("settings.png")
+        ) ? 0 : 1
+        state.editorShowsSettings = false
+
+        print(failures == 0 ? "Saved 4 screenshots to \(dir.path)" : "\(failures) screenshot(s) failed")
         return failures == 0 ? 0 : 1
     }
 

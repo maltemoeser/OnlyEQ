@@ -24,12 +24,18 @@ struct EditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
-            Divider()
-            graph
-            bandStrip
-            Divider()
-            bottomBar
+            if state.editorShowsSettings {
+                settingsBar
+                Divider()
+                SettingsView()
+            } else {
+                toolbar
+                Divider()
+                graph
+                bandStrip
+                Divider()
+                bottomBar
+            }
         }
         .sheet(item: $importPresentation) { presentation in
             ImportSheet(profileSuggestion: presentation.profileSuggestion).environmentObject(state)
@@ -100,6 +106,33 @@ struct EditorView: View {
             } label: {
                 Label("Import…", systemImage: "square.and.arrow.down")
             }
+
+            Button {
+                state.editorShowsSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .keyboardShortcut(",", modifiers: .command)
+            .help("Settings")
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 8)
+    }
+
+    private var settingsBar: some View {
+        HStack {
+            Button {
+                state.editorShowsSettings = false
+            } label: {
+                Label("Equalizer", systemImage: "chevron.left")
+            }
+            .keyboardShortcut(.cancelAction)
+            Spacer()
+            Text("Settings").font(.system(size: 12, weight: .semibold))
+            Spacer()
+            // Balances the leading button so the title stays centred.
+            Label("Equalizer", systemImage: "chevron.left").hidden()
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
