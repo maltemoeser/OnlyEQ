@@ -266,13 +266,28 @@ struct SoundSettings: View {
                     Text("Blend a little of each channel into the other, as speakers do, so hard-panned recordings sound less split on headphones.")
                 }
                 if state.crossfeedEnabled {
-                    LabeledContent("Amount") {
-                        Slider(value: $state.crossfeedLevelDB, in: -12.0...(-3.0)) {
-                            Text("Amount")
+                    Picker("Preset", selection: $state.crossfeedPreset) {
+                        ForEach(CrossfeedPreset.allCases) { preset in
+                            Text(preset.title).tag(preset)
                         }
-                        Text(String(format: "%.0f dB", state.crossfeedLevelDB))
-                            .font(.system(size: 11).monospacedDigit())
-                            .frame(width: 64, alignment: .trailing)
+                    }
+                    if state.crossfeedPreset == .custom {
+                        LabeledContent("Amount") {
+                            Slider(value: $state.crossfeedLevelDB, in: -12.0...(-3.0)) {
+                                Text("Amount")
+                            }
+                            Text(String(format: "%.1f dB", state.crossfeedLevelDB))
+                                .font(.system(size: 11).monospacedDigit())
+                                .frame(width: 64, alignment: .trailing)
+                        }
+                        LabeledContent("Cutoff") {
+                            Slider(value: $state.crossfeedCutoffHz, in: 400...1000, step: 10) {
+                                Text("Cutoff")
+                            }
+                            Text(String(format: "%.0f Hz", state.crossfeedCutoffHz))
+                                .font(.system(size: 11).monospacedDigit())
+                                .frame(width: 64, alignment: .trailing)
+                        }
                     }
                 }
             }

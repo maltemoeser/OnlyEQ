@@ -9,15 +9,47 @@ struct CrossfeedParameters {
     var lowPassCoefficient: Float = 0  // first-order low-pass: y += a * (x - y)
     var delaySamples: Int = 0
 
-    static let cutoffHz = 700.0
     static let delaySeconds = 0.0003
 
-    static func make(levelDB: Double, sampleRate: Double) -> CrossfeedParameters {
+    static func make(levelDB: Double, cutoffHz: Double = CrossfeedPreset.chuMoy.cutoffHz,
+                     sampleRate: Double) -> CrossfeedParameters {
         CrossfeedParameters(
             feed: Float(pow(10, levelDB / 20)),
             lowPassCoefficient: Float(1 - exp(-2 * .pi * cutoffHz / sampleRate)),
             delaySamples: min(Int((delaySeconds * sampleRate).rounded()), CrossfeedState.maxDelay - 1)
         )
+    }
+}
+
+/// The three published crossfeed settings (as shipped in bs2b), plus a
+/// custom pair. Cutoff is the low-pass corner; level is the cross feed.
+enum CrossfeedPreset: String, CaseIterable, Identifiable {
+    case natural, chuMoy, meier, custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .natural: "Natural (700 Hz, −4.5 dB)"
+        case .chuMoy: "Chu Moy (700 Hz, −6 dB)"
+        case .meier: "Jan Meier (650 Hz, −9.5 dB)"
+        case .custom: "Custom"
+        }
+    }
+
+    var cutoffHz: Double {
+        switch self {
+        case .natural, .chuMoy, .custom: 700
+        case .meier: 650
+        }
+    }
+
+    var levelDB: Double {
+        switch self {
+        case .natural: -4.5
+        case .chuMoy, .custom: -6
+        case .meier: -9.5
+        }
     }
 }
 

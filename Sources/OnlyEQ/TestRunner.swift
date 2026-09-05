@@ -217,11 +217,11 @@ enum TestRunner {
     }
 
     private static func crossfeedTests() {
-        func run(levelDB: Double, hz: Double, left: Float, right: Float) -> (left: Float, right: Float) {
+        func run(levelDB: Double, cutoffHz: Double = 700, hz: Double, left: Float, right: Float) -> (left: Float, right: Float) {
             let proc = EQProcessor()
             proc.configure(sampleRate: 48000)
             proc.update(bands: [], preampDB: 0, limiterEnabled: false, limiterCeilingDB: -1, bypassed: false,
-                        crossfeedEnabled: true, crossfeedLevelDB: levelDB)
+                        crossfeedEnabled: true, crossfeedLevelDB: levelDB, crossfeedCutoffHz: cutoffHz)
             var l = (0..<9600).map { Float(sin(Double($0) * 2 * .pi * hz / 48000)) * left }
             var r = (0..<9600).map { Float(sin(Double($0) * 2 * .pi * hz / 48000)) * right }
             l.withUnsafeMutableBufferPointer { lb in
@@ -246,6 +246,14 @@ enum TestRunner {
         let treble = run(levelDB: -6, hz: 10000, left: 1, right: 0)
         expect(treble.right < 0.06, "crossfeed leaves treble localisation alone")
         expect(treble.left > 0.95, "crossfeed leaves near-ear treble alone")
+
+        // Presets: Meier's lower cutoff crosses less of a 700 Hz tone than the
+        // 700 Hz designs do, and the published pairs are what the enum holds.
+        let meier = run(levelDB: CrossfeedPreset.meier.levelDB, cutoffHz: CrossfeedPreset.meier.cutoffHz, hz: 700, left: 1, right: 0)
+        let natural = run(levelDB: CrossfeedPreset.natural.levelDB, cutoffHz: CrossfeedPreset.natural.cutoffHz, hz: 700, left: 1, right: 0)
+        expect(meier.right < natural.right, "Meier preset crosses less than Natural (\(meier.right) vs \(natural.right))")
+        expect(CrossfeedPreset.meier.cutoffHz == 650 && CrossfeedPreset.chuMoy.levelDB == -6 && CrossfeedPreset.natural.levelDB == -4.5,
+               "crossfeed presets carry the bs2b parameter sets")
 
         let off = EQProcessor()
         off.configure(sampleRate: 48000)
