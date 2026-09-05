@@ -387,6 +387,12 @@ enum TestRunner {
         let ceiling = pow(10, Float(-1.0) / 20) * 1.05
         expect(sine[2400...].map(abs).max()! <= ceiling, "limiter caps output at ceiling")
 
+        let alignProc = EQProcessor()
+        alignProc.configure(sampleRate: 48000)
+        alignProc.update(bands: [], preampDB: -6, outputGainDB: -2, limiterEnabled: false,
+                         limiterCeilingDB: -1, bypassed: false)
+        expect(abs(alignProc.staticGainDB + 8) < 1e-4, "processor reports preamp plus output gain for spectrum alignment")
+
         let analyzer = SpectrumAnalyzer()
         analyzer.configure(sampleRate: 48000)
         analyzer.setActive(true)

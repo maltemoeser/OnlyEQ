@@ -45,6 +45,12 @@ final class EQProcessor {
         var isActive = false
     }
     private let meter = OSAllocatedUnfairLock(initialState: MeterState())
+
+    /// Preamp plus output gain of the latest update, in dB. The spectrum view
+    /// subtracts it from the output bars so input and output line up and only
+    /// the filter shape shows as a difference.
+    private let staticGain = OSAllocatedUnfairLock(initialState: Float(0))
+    var staticGainDB: Float { staticGain.withLock { $0 } }
     var currentPeak: Float {
         meter.withLock { state in
             let value = state.peak
@@ -87,6 +93,7 @@ final class EQProcessor {
         }
         snap.preampLinear = Float(pow(10, preampDB / 20))
         snap.outputGainLinear = Float(pow(10, outputGainDB / 20))
+        staticGain.withLock { $0 = Float(preampDB + outputGainDB) }
         snap.limiterEnabled = limiterEnabled
         snap.limiterCeilingLinear = Float(pow(10, limiterCeilingDB / 20))
         snap.bypassed = bypassed

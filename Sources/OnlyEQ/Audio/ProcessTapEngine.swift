@@ -69,6 +69,8 @@ final class ProcessTapEngine {
 
     let processor = EQProcessor()
     let spectrum = SpectrumAnalyzer()
+    /// Pre-EQ spectrum, drawn behind the processed one so the EQ's effect is visible.
+    let inputSpectrum = SpectrumAnalyzer()
 
     private(set) var state: State = .stopped
     private(set) var targetDeviceID: AudioObjectID = 0
@@ -155,6 +157,7 @@ final class ProcessTapEngine {
         let sampleRate = AudioDeviceManager.nominalSampleRate(deviceID)
         processor.configure(sampleRate: sampleRate)
         spectrum.configure(sampleRate: sampleRate)
+        inputSpectrum.configure(sampleRate: sampleRate)
 
         // 2. Wrap the real output device + tap in a private aggregate.
         let aggregateUID = "OnlyEQ-Aggregate-\(deviceUID)"
@@ -408,6 +411,7 @@ final class ProcessTapEngine {
             }
             activeChannels.append(scratch)
         }
+        inputSpectrum.push(channels: activeChannels, frameCount: frameCount)
         processor.process(channels: activeChannels, frameCount: frameCount)
         spectrum.push(channels: activeChannels, frameCount: frameCount)
 
