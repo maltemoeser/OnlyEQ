@@ -13,7 +13,88 @@ struct BiquadCoefficients: Equatable {
         let q = max(rawQ, 0.025)
         let a = pow(10.0, gainDB / 40.0)
         let w0 = 2.0 * Double.pi * fc / sampleRate
-        return makeMatched(type: type, w0: w0, a: a, q: q) ?? makeBilinear(type: type, w0: w0, a: a, q: q)
+        let matched = makeMatched(type: type, w0: w0, a: a, q: q) ?? makeBilinear(type: type, w0: w0, a: a, q: q)
+        guard type == .lowShelf || type == .highShelf,
+              let fit = makeShelfFit(type: type, w0: w0, a: a, q: q) else { return matched }
+        // Both shelf designs are approximations with different failure modes,
+        // so keep whichever tracks the analog prototype more closely here.
+        let fitError = fit.worstError(type: type, w0: w0, a: a, q: q)
+        let matchedError = matched.worstError(type: type, w0: w0, a: a, q: q)
+        return fitError < matchedError ? fit : matched
+    }
+
+    /// Largest deviation in dB from the analog prototype over the audio band
+    /// up to just below Nyquist, on a 24-point log grid.
+    private func worstError(type: FilterType, w0: Double, a: Double, q: Double) -> Double {
+        let fs = 2.0  // any rate; w0 fixes the geometry
+        let f0 = w0 / (2 * .pi) * fs
+        let lo = log10(20.0 / 48000 * fs), hi = log10(0.499 * fs)
+        var worst = 0.0
+        for i in 0..<24 {
+            let f = pow(10, lo + (hi - lo) * Double(i) / 23)
+            let target = 10 * log10(Self.analogMagnitudeSquared(type: type, ratio: f / f0, a: a, q: q))
+            worst = max(worst, abs(magnitudeDB(at: f, sampleRate: fs) - target))
+        }
+        return worst
+    }
+
+    // MARK: Shelf fit (Vicanek, "Matched Two-Pole Digital Shelving Filters", 2024)
+
+    /// Vicanek's two-pole shelving fit. Unlike `makeMatched`, the poles are
+    /// not mapped from the analog filter: numerator and denominator are fitted
+    /// jointly from five magnitude conditions (unity at DC, the analog slope
+    /// at DC, an exact match at Nyquist, and matches at two interior
+    /// frequencies chosen to keep the coefficient square roots real). The paper
+    /// is Butterworth-only; the DC-slope condition here generalises it to any
+    /// Q, and `make` falls back to the pole-matched design when that fit is
+    /// worse. Works for corner frequencies above Nyquist, where the
+    /// impulse-invariant poles of `makeMatched` alias.
+    private static func makeShelfFit(type: FilterType, w0: Double, a rawA: Double, q: Double) -> BiquadCoefficients? {
+        // A low shelf is a high shelf with reciprocal gain, scaled back at the end.
+        let a = type == .lowShelf ? 1 / rawA : rawA
+        guard abs(a - 1) > 1e-5 else { return nil }
+        let fc = w0 / .pi  // in units of Nyquist
+
+        func h(_ f: Double) -> Double {
+            analogMagnitudeSquared(type: .highShelf, ratio: f / fc, a: a, q: q)
+        }
+        let hNy = h(1)
+        let f1 = fc / sqrt(0.160 + 1.543 * fc * fc)
+        let f2 = fc / sqrt(0.947 + 3.806 * fc * fc)
+        let h1 = h(f1), h2 = h(f2)
+        let phi1 = pow(sin(.pi / 2 * f1), 2), phi2 = pow(sin(.pi / 2 * f2), 2)
+        // Analog |H|² ≈ 1 + (1/Q² − 2)(A − 1/A)(f/fc)² near DC; in φ = sin²(πf/2) ≈ (πf/2)².
+        let slope = 4 / (.pi * .pi * fc * fc) * (1 / (q * q) - 2) * (a - 1 / a)
+
+        let d1 = (h1 - 1) * (1 - phi1) - slope * phi1 * (1 - phi1)
+        let c11 = -phi1 * (h1 - 1) * (1 - phi1)
+        let c12 = phi1 * phi1 * (hNy - h1)
+        let d2 = (h2 - 1) * (1 - phi2) - slope * phi2 * (1 - phi2)
+        let c21 = -phi2 * (h2 - 1) * (1 - phi2)
+        let c22 = phi2 * phi2 * (hNy - h2)
+        let det = c11 * c22 - c12 * c21
+        guard abs(det) > 1e-18, abs(c12) > 1e-18 else { return nil }
+        let alpha1 = (c22 * d1 - c12 * d2) / det
+        let A1 = (d1 - c11 * alpha1) / c12
+        let B1 = hNy * A1
+        let A2 = 0.25 * (alpha1 - A1)
+        let B2 = 0.25 * (alpha1 + slope - B1)
+        guard A1 >= 0, B1 >= 0 else { return nil }
+
+        let v = 0.5 * (1 + sqrt(A1))
+        let w = 0.5 * (1 + sqrt(B1))
+        guard v * v + A2 >= 0, w * w + B2 >= 0 else { return nil }
+        let a0 = 0.5 * (v + sqrt(v * v + A2))
+        let b0u = 0.5 * (w + sqrt(w * w + B2))
+        guard a0 > 0, b0u > 0 else { return nil }
+        let a1 = (1 - v) / a0
+        let a2 = -0.25 * A2 / (a0 * a0)
+        let scale = (type == .lowShelf ? rawA * rawA : 1) / a0
+        let b0 = b0u * scale
+        let b1 = (1 - w) * scale
+        let b2 = (-0.25 * B2 / b0u) * scale
+        guard [a1, a2, b0, b1, b2].allSatisfy(\.isFinite), abs(a2) < 1, abs(a1) < 1 + a2 else { return nil }
+        return BiquadCoefficients(b0: Float(b0), b1: Float(b1), b2: Float(b2), a1: Float(a1), a2: Float(a2))
     }
 
     // MARK: Matched (decramped) design

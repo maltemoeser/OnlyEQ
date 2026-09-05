@@ -289,6 +289,27 @@ enum TestRunner {
         expect(worstEQ < 0.35, "matched peaks and shelves track the analog target within 0.35 dB (worst \(worstEQ))")
         expect(worstPass < 1, "matched pass, notch and band-pass filters track within 1 dB (worst \(worstPass))")
         expect(worstBilinearEQ > 1, "bilinear peaks and shelves cramp near Nyquist (worst \(worstBilinearEQ))")
+
+        // Shelves at and beyond Nyquist: the pole-matched design used to fall
+        // back to bilinear (or worse, fit badly just below its guard), so the
+        // very shelves the matched design exists for were cramped.
+        var worstShelf = 0.0
+        let shelfCases: [(FilterType, Double, Double, Double)] = [
+            (.highShelf, 12000, 20, 0.71), (.highShelf, 16800, 12, 0.71), (.highShelf, 21000, 6, 0.71),
+            (.lowShelf, 21600, 20, 0.71), (.lowShelf, 23800, 6, 0.71), (.lowShelf, 12000, 12, 0.71),
+            (.highShelf, 12000, 6, 1.0), (.highShelf, 10000, 8, 0.5), (.lowShelf, 15000, -9, 1.2),
+        ]
+        for (type, fc, gain, q) in shelfCases {
+            let fs = 44100.0
+            let a = pow(10.0, gain / 40.0)
+            let coefficients = BiquadCoefficients.make(type: type, frequency: fc, gainDB: gain, q: q, sampleRate: fs)
+            for f in EQResponse.logGrid(count: 200) where f < fs * 0.499 {
+                let target = 10 * log10(BiquadCoefficients.analogMagnitudeSquared(type: type, ratio: f / fc, a: a, q: q))
+                worstShelf = max(worstShelf, abs(coefficients.magnitudeDB(at: f, sampleRate: fs) - target))
+            }
+        }
+        expect(worstShelf < 1, "shelves near and above Nyquist track the analog target within 1 dB (worst \(worstShelf))")
+        print("  shelf fit: worst near-Nyquist error \(String(format: "%.3f", worstShelf)) dB")
         print("  decramping: matched worst \(String(format: "%.3f", worstEQ)) dB, bilinear worst \(String(format: "%.2f", worstBilinearEQ)) dB")
 
         // Sample-rate independence: the same band at 44.1 and 96 kHz agree.
