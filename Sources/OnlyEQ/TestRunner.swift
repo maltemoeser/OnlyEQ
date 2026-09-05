@@ -426,6 +426,20 @@ enum TestRunner {
         analyzer.setActive(true)
         expect(analyzer.bars().allSatisfy { $0 == 0 }, "reactivating spectrum starts with a cleared ring")
 
+        // Bass resolution: a 50 Hz tone must land in its own bar, not smear
+        // across every bar that shares the short FFT's first few bins.
+        var bass = (0..<16384).map { Float(sin(Double($0) * 2 * .pi * 50 / 48000)) }
+        bass.withUnsafeMutableBufferPointer { buffer in
+            analyzer.push(channels: [buffer.baseAddress!], frameCount: buffer.count)
+        }
+        let bassBars = analyzer.bars(now: ProcessInfo.processInfo.systemUptime + 20)
+        let bassBar = bassBars.indices.max(by: { bassBars[$0] < bassBars[$1] }) ?? -1
+        expect(bassBar == 6, "50 Hz tone lands in bar 6 (\(bassBar))")
+        let expectedBass = (SpectrumAnalyzer.tiltDBPerOctave * log2(SpectrumAnalyzer.barCenterHz(6) / 1000) + 60) / 60
+        expect(abs(bassBars[6] - expectedBass) < 0.02, "50 Hz tone reads 0 dBFS before tilt (\(bassBars[6]) vs \(expectedBass))")
+        expect(bassBars[4] < bassBars[6] - 0.3 && bassBars[8] < bassBars[6] - 0.3,
+               "bars two steps away from a 50 Hz tone are at least 18 dB down")
+
         // Bluetooth device-name cleanup and deterministic catalog ranking.
         expect(HeadphoneNameMatcher.searchQuery(for: "Aaron’s WH-1000XM5 Stereo") == "WH-1000XM5",
                "headphone matcher strips owner and Bluetooth noise")
