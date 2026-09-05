@@ -13,6 +13,82 @@ struct BiquadCoefficients: Equatable {
         let q = max(rawQ, 0.025)
         let a = pow(10.0, gainDB / 40.0)
         let w0 = 2.0 * Double.pi * fc / sampleRate
+        return makeMatched(type: type, w0: w0, a: a, q: q) ?? makeBilinear(type: type, w0: w0, a: a, q: q)
+    }
+
+    // MARK: Matched (decramped) design
+
+    /// Magnitude squared of the RBJ analog prototype at `r` = ω / ω0.
+    /// For p(s) = c2 s² + c1 s + c0, |p(jr)|² = (c0 − c2 r²)² + (c1 r)².
+    static func analogMagnitudeSquared(type: FilterType, ratio r: Double, a: Double, q: Double) -> Double {
+        func mag2(_ c2: Double, _ c1: Double, _ c0: Double) -> Double {
+            let re = c0 - c2 * r * r, im = c1 * r
+            return re * re + im * im
+        }
+        switch type {
+        case .peak: return mag2(1, a / q, 1) / mag2(1, 1 / (a * q), 1)
+        case .lowShelf: return a * a * mag2(1, sqrt(a) / q, a) / mag2(a, sqrt(a) / q, 1)
+        case .highShelf: return a * a * mag2(a, sqrt(a) / q, 1) / mag2(1, sqrt(a) / q, a)
+        case .lowPass: return 1 / mag2(1, 1 / q, 1)
+        case .highPass: return mag2(1, 0, 0) / mag2(1, 1 / q, 1)
+        case .notch: return mag2(1, 0, 1) / mag2(1, 1 / q, 1)
+        case .bandPass: return mag2(0, 1 / q, 0) / mag2(1, 1 / q, 1)
+        }
+    }
+
+    /// Vicanek's matched second-order design: poles by impulse invariance of
+    /// the analog prototype, zeros chosen so the digital magnitude equals the
+    /// analog one at DC, ω0 and Nyquist. Unlike the bilinear transform this
+    /// keeps peaks and shelves near Nyquist at their intended width and
+    /// height, so a preset sounds the same at 44.1 and 96 kHz. Returns nil
+    /// when the pole frequency is too close to Nyquist for the match to be
+    /// meaningful; the caller then falls back to the bilinear design.
+    private static func makeMatched(type: FilterType, w0: Double, a: Double, q: Double) -> BiquadCoefficients? {
+        // Natural frequency (relative to ω0) and Q of the prototype's denominator.
+        let (poleRatio, poleQ): (Double, Double) = switch type {
+        case .peak: (1, a * q)
+        case .lowShelf: (1 / sqrt(a), q)
+        case .highShelf: (sqrt(a), q)
+        case .lowPass, .highPass, .notch, .bandPass: (1, q)
+        }
+        let wp = w0 * poleRatio
+        guard wp < 0.95 * Double.pi else { return nil }
+
+        let zeta = 1 / (2 * poleQ)
+        let decay = exp(-zeta * wp)
+        let a2 = decay * decay
+        let a1 = zeta <= 1
+            ? -2 * decay * cos(sqrt(1 - zeta * zeta) * wp)
+            : -2 * decay * cosh(sqrt(zeta * zeta - 1) * wp)
+
+        // |D(e^jω)|² = A0 φ0 + A1 φ1 + A2 φ2 with φ = sin²(ω/2).
+        let A0 = (1 + a1 + a2) * (1 + a1 + a2)
+        let A1 = (1 - a1 + a2) * (1 - a1 + a2)
+        let A2 = -4 * a2
+        let phi = sin(w0 / 2) * sin(w0 / 2)
+        let phi0 = 1 - phi, phi1 = phi, phi2 = 4 * phi * (1 - phi)
+
+        let hDC = analogMagnitudeSquared(type: type, ratio: 0, a: a, q: q)
+        let hNyquist = analogMagnitudeSquared(type: type, ratio: Double.pi / w0, a: a, q: q)
+        let hCenter = analogMagnitudeSquared(type: type, ratio: 1, a: a, q: q)
+        let B0 = A0 * hDC
+        let B1 = A1 * hNyquist
+        let B2 = (hCenter * (A0 * phi0 + A1 * phi1 + A2 * phi2) - B0 * phi0 - B1 * phi1) / phi2
+
+        let sumEven = (sqrt(B0) + sqrt(B1)) / 2  // b0 + b2
+        // Rounding can push an exact zero (high-pass, notch) slightly negative.
+        let discriminant = sumEven * sumEven + B2
+        guard discriminant >= -1e-9 else { return nil }
+        let b0 = (sumEven + sqrt(max(discriminant, 0))) / 2
+        let b2 = sumEven - b0
+        let b1 = (sqrt(B0) - sqrt(B1)) / 2
+        guard [b0, b1, b2, a1, a2].allSatisfy(\.isFinite) else { return nil }
+        return BiquadCoefficients(b0: Float(b0), b1: Float(b1), b2: Float(b2), a1: Float(a1), a2: Float(a2))
+    }
+
+    // MARK: Bilinear (RBJ cookbook) design
+
+    static func makeBilinear(type: FilterType, w0: Double, a: Double, q: Double) -> BiquadCoefficients {
         let cosw = cos(w0), sinw = sin(w0)
         let alpha = sinw / (2.0 * q)
 
