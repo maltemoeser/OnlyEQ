@@ -8,6 +8,33 @@ System-wide parametric EQ for macOS. Lives in the menu bar. No virtual audio dri
 
 Every Mac EQ I tried either made me install BlackHole or a HAL driver, charged for parametric bands, or buried a simple job under a complicated UI. OnlyEQ instead uses the process tap API Apple added in macOS 14.4: it taps the system output mix, runs it through biquad filters, and plays the result back to your output device. Nothing to install, no password, no coreaudiod restarts, and your volume keys keep working. Adds about 10 ms of latency at the default 256-frame buffer (configurable from 128 to 1024 in Settings — this is fine for music and video; for latency-critical monitoring in a DAW, add the DAW to the exclude list instead).
 
+## Changes in this fork
+
+This is a fork of [zollans/OnlyEQ](https://github.com/zollans/OnlyEQ). Everything below was added here and is not in the upstream app.
+
+**Listening**
+
+- **Bypass instead of Flat.** The popover's Flat button and its hotkey silently overwrote the active preset with a flat curve, and the previous preset could only be recovered by importing it again. Both now toggle Bypass, which leaves the preset untouched.
+- **Level-matched bypass.** Bypass keeps the preamp, output gain, and limiter active and skips only the filter bands, so an A/B comparison is not decided by the unprocessed side being louder.
+- **Crossfeed** for headphones (Bauer-style: 700 Hz low-pass, 0.3 ms delay, adjustable feed level). Toggle in the popover and the editor, amount in Settings › Advanced.
+- **Loudness compensation** following the ISO 226 equal-loudness contours: low and high shelves grow as the volume drops below a reference level you set, and the preamp absorbs the boost so nothing clips.
+- **Matched biquads.** Filters use Vicanek's matched second-order design instead of the bilinear transform, so peaks and shelves near 20 kHz keep their intended shape and a preset measures the same at 44.1 kHz and 96 kHz.
+
+**Presets and import**
+
+- Applying an imported or searched preset saves it, so it stays in the preset picker instead of disappearing on the next switch.
+- Filter lines without a `Gain` term (Equalizer APO, REW, and AutoEq write LP, HP, BP, and notch lines this way) import instead of being dropped.
+- An undecodable `presets.json` or `profiles.json` is moved aside as `<name>.corrupt-<timestamp>` instead of being overwritten with an empty file.
+- Saving a preset under an existing name keeps the menu checkmark and the next-preset hotkey in sync.
+
+**Fixes from a whole-codebase review**
+
+- The render thread no longer allocates or frees memory when the band count or the filter snapshot changes.
+- Excluded apps launched after the tap was created are now excluded, without waiting for a device change.
+- Typed band values are clamped to the canvas range, and a frequency shown as "1.5 kHz" edits as 1500 rather than 1.5 Hz.
+- Concurrent online database loads no longer race, and the import sheet cancels stale parse and preview work.
+- Cmd-A/C/V/X/Z/W in the editor work on Cyrillic, Greek, and Hebrew keyboard layouts.
+
 ## Install
 
 ```sh
