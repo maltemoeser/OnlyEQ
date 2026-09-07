@@ -601,9 +601,18 @@ final class AppState: ObservableObject {
 
     // MARK: - A/B
 
-    /// True when the slot not currently in use already holds a curve. Until
-    /// then, switching copies the current curve into it.
-    var otherABSlotIsFilled: Bool { abPresets[1 - abSlot] != nil }
+    /// The curve a slot holds: the working preset for the selected slot, the
+    /// stored copy for the other, nil while the other slot is still empty.
+    func abPreset(inSlot slot: Int) -> EQPreset? {
+        slot == abSlot ? preset : abPresets[slot]
+    }
+
+    /// True when the curve in `slot` differs from the stored preset it came from.
+    func abSlotIsModified(_ slot: Int) -> Bool {
+        guard let held = abPreset(inSlot: slot),
+              let saved = store.allPresets.first(where: { $0.id == held.id }) else { return false }
+        return saved != held
+    }
 
     private struct ABSnapshot {
         var preset: EQPreset
@@ -624,7 +633,18 @@ final class AppState: ObservableObject {
         registerABUndo(restoring: before, undoManager: undoManager)
     }
 
-    private func registerABUndo(restoring snapshot: ABSnapshot, undoManager: UndoManager?) {
+    /// Puts `newPreset` in `slot` and switches to it, keeping the other slot
+    /// as the reference. One undo step.
+    func compare(with newPreset: EQPreset, inSlot slot: Int, undoManager: UndoManager? = nil) {
+        let before = abSnapshot
+        abPresets[abSlot] = preset
+        abSlot = slot
+        apply(newPreset)
+        registerABUndo(restoring: before, actionName: "Compare with \(newPreset.name)", undoManager: undoManager)
+    }
+
+    private func registerABUndo(restoring snapshot: ABSnapshot, actionName: String = "Switch A/B",
+                                undoManager: UndoManager?) {
         guard let undoManager else { return }
         undoManager.registerUndo(withTarget: self) { state in
             let current = state.abSnapshot
@@ -632,9 +652,9 @@ final class AppState: ObservableObject {
             state.abSlot = snapshot.slot
             state.preset = snapshot.preset
             state.flushWorkingPresetPersistence()
-            state.registerABUndo(restoring: current, undoManager: undoManager)
+            state.registerABUndo(restoring: current, actionName: actionName, undoManager: undoManager)
         }
-        undoManager.setActionName("Switch A/B")
+        undoManager.setActionName(actionName)
     }
 
     // MARK: - Volume
