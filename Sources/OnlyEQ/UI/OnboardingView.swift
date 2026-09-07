@@ -43,9 +43,10 @@ struct OnboardingView: View {
             Text("System-wide EQ\nfor your Mac")
                 .font(.largeTitle.weight(.bold))
                 .multilineTextAlignment(.center)
-            Text("Hear your music the way it was meant to sound.")
+            Text("A parametric EQ for everything your Mac plays. Nothing to install, nothing to babysit.")
                 .font(.body)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Spacer()
             Button("Get Started") { step = 1 }
                 .buttonStyle(.borderedProminent)
@@ -70,7 +71,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
             Button("Open System Settings") { PermissionHelper.openSystemSettings() }
                 .buttonStyle(.borderedProminent)
-            Button("I’ve enabled it") { step = 2 }
+            Button("I’ve Enabled It") { step = 2 }
 
             GroupBox {
                 HStack(spacing: 8) {
@@ -101,7 +102,7 @@ struct OnboardingView: View {
                 .font(.title.weight(.bold))
                 .multilineTextAlignment(.center)
                 .padding(.top, 18)
-            Text("We’ll import a preset tuned for your headphones.")
+            Text("Pick your headphones to import a preset tuned for them.")
                 .font(.callout).foregroundStyle(.secondary)
 
             HStack {
@@ -156,7 +157,7 @@ struct OnboardingView: View {
             }
 
             HStack {
-                Button("Skip — start flat") { finish(apply: nil) }
+                Button("Skip and Start Flat") { finish(apply: nil) }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()

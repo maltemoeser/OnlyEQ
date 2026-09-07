@@ -239,7 +239,7 @@ struct EditorView: View {
                 } else if bandLimitReached {
                     Label("32 bands maximum", systemImage: "plus.circle")
                         .font(.caption).foregroundStyle(.tertiary).padding(4)
-                } else {
+                } else if state.preset.bands.isEmpty {
                     Label("Double-click graph to add band", systemImage: "plus.circle")
                         .font(.caption).foregroundStyle(.tertiary).padding(4)
                 }

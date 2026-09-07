@@ -207,9 +207,9 @@ struct PopoverView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Open the editor")
+        .help("Open the equalizer")
         .accessibilityLabel("EQ curve")
-        .accessibilityHint("Opens the editor")
+        .accessibilityHint("Opens the equalizer")
     }
 
     private var permissionBanner: some View {
@@ -246,7 +246,7 @@ struct PopoverView: View {
             Button {
                 WindowManager.shared.showEditor()
             } label: {
-                Label("Editor", systemImage: "slider.horizontal.3")
+                Label("Equalizer", systemImage: "slider.horizontal.3")
                     .font(.subheadline)
             }
             Menu {
