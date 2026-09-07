@@ -49,7 +49,7 @@ struct GeneralSettings: View {
 
             Toggle(isOn: $state.autoSuggestHeadphoneProfiles) {
                 Text("Suggest profiles for new Bluetooth headphones")
-                Text("Open preset search when an unrecognized Bluetooth output becomes active.")
+                Text("Offer a preset search in the popover when an unrecognized Bluetooth output becomes active.")
             }
 
             Section {
