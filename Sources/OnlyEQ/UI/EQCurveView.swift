@@ -23,7 +23,7 @@ private final class EQCurveResponseCache: ObservableObject {
         var combinedFrequencies: [Double]
         var combinedResponse: [Double]
         var individualFrequencies: [Double]
-        var individualResponses: [(index: Int, response: [Double])]
+        var individualResponses: [(colorIndex: Int, response: [Double])]
     }
 
     private static let combinedFrequencies = EQResponse.logGrid(count: 128)
@@ -43,7 +43,7 @@ private final class EQCurveResponseCache: ObservableObject {
             )
         }
 
-        var enabledResponses: [(index: Int, response: [Double])] = []
+        var enabledResponses: [(colorIndex: Int, response: [Double])] = []
         if includeIndividuals {
             if individualBands.count != bands.count {
                 individualBands = bands
@@ -59,7 +59,7 @@ private final class EQCurveResponseCache: ObservableObject {
                 }
             }
             enabledResponses = bands.indices.compactMap { index in
-                bands[index].isEnabled ? (index, individualResponses[index]) : nil
+                bands[index].isEnabled ? (bands[index].colorIndex ?? index, individualResponses[index]) : nil
             }
         }
 
@@ -192,7 +192,7 @@ struct EQCurveView: View {
                                         y: y(forDB: min(max(item.response[j], -rangeDB), rangeDB), size))
                         if j == 0 { path.move(to: p) } else { path.addLine(to: p) }
                     }
-                    ctx.stroke(path, with: .color(BandPalette.color(item.index).opacity(0.22)),
+                    ctx.stroke(path, with: .color(BandPalette.color(item.colorIndex).opacity(0.22)),
                                style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 }
             }
@@ -219,9 +219,8 @@ struct EQCurveView: View {
 
     @ViewBuilder
     private func nodeLayer(size: CGSize) -> some View {
-        ForEach(Array(bands.enumerated()), id: \.element.id) { index, band in
+        ForEach(bands) { band in
             DraggableBandNode(
-                index: index,
                 band: band,
                 size: size,
                 rangeDB: rangeDB,
@@ -428,7 +427,6 @@ private final class SpectrumBarsNSView: NSView {
 /// so a high-polling-rate mouse cannot rebuild the entire editor hundreds of
 /// times per second.
 private struct DraggableBandNode: View {
-    let index: Int
     let band: EQBand
     let size: CGSize
     let rangeDB: Double
@@ -445,7 +443,7 @@ private struct DraggableBandNode: View {
     var body: some View {
         let isSelected = selectedBandID == band.id
         Circle()
-            .fill(BandPalette.color(index))
+            .fill(BandPalette.color(band.colorIndex ?? 0))
             .frame(width: isSelected ? 14 : 11, height: isSelected ? 14 : 11)
             .overlay(Circle().stroke(.white.opacity(isSelected ? 0.9 : 0.5),
                                      lineWidth: isSelected ? 2 : 1))

@@ -25,8 +25,12 @@ struct EQBand: Identifiable, Codable, Equatable, Hashable {
     var gain: Double = 0
     var q: Double = 1.41
     var isEnabled = true
+    /// Palette slot, assigned when the band joins a preset and kept for the
+    /// band's life, so deleting a neighbour never recolours it. Like `id`,
+    /// it is identity rather than value and is ignored by equality.
+    var colorIndex: Int?
 
-    private enum CodingKeys: String, CodingKey { case type, frequency, gain, q, isEnabled }
+    private enum CodingKeys: String, CodingKey { case type, frequency, gain, q, isEnabled, colorIndex }
 
     init(type: FilterType = .peak, frequency: Double = 1000, gain: Double = 0, q: Double = 1.41, isEnabled: Bool = true) {
         self.type = type
@@ -43,6 +47,7 @@ struct EQBand: Identifiable, Codable, Equatable, Hashable {
         gain = try c.decodeIfPresent(Double.self, forKey: .gain) ?? 0
         q = try c.decodeIfPresent(Double.self, forKey: .q) ?? 1.41
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        colorIndex = try c.decodeIfPresent(Int.self, forKey: .colorIndex)
     }
 
     // `id` is a runtime identity for SwiftUI, not part of the value — it isn't
@@ -65,9 +70,42 @@ struct EQPreset: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
     var preampDB: Double = 0
-    var bands: [EQBand] = []
+    var bands: [EQBand] = [] { didSet { assignBandColors() } }
     /// Where the preset came from, e.g. "AutoEq parametric", "peqdb", "Imported file".
     var source: String?
+
+    init(id: UUID = UUID(), name: String, preampDB: Double = 0, bands: [EQBand] = [], source: String? = nil) {
+        self.id = id
+        self.name = name
+        self.preampDB = preampDB
+        self.bands = bands
+        self.source = source
+        assignBandColors()
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, preampDB, bands, source }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        preampDB = try c.decodeIfPresent(Double.self, forKey: .preampDB) ?? 0
+        bands = try c.decodeIfPresent([EQBand].self, forKey: .bands) ?? []
+        source = try c.decodeIfPresent(String.self, forKey: .source)
+        assignBandColors()
+    }
+
+    /// Gives every band without a palette slot the lowest one no other band
+    /// holds. Existing slots are never touched.
+    private mutating func assignBandColors() {
+        var taken = Set(bands.compactMap(\.colorIndex))
+        for index in bands.indices where bands[index].colorIndex == nil {
+            var slot = 0
+            while taken.contains(slot) { slot += 1 }
+            bands[index].colorIndex = slot
+            taken.insert(slot)
+        }
+    }
 
     // Built-ins carry fixed IDs so device profiles that reference them keep
     // resolving across launches (a fresh UUID() per launch would break them).
