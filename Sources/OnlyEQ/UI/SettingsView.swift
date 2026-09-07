@@ -353,13 +353,13 @@ struct AdvancedSettings: View {
                 LabeledContent {
                     Button("Reset…", role: .destructive) { confirmReset = true }
                 } label: {
-                    Text("Reset all settings…")
-                    Text("This will reset all preferences to their defaults.")
+                    Text("Reset OnlyEQ")
+                    Text("Removes presets, device profiles, and preferences, as on first launch.")
                 }
             }
         }
         .formStyle(.grouped)
-        .confirmationDialog("Reset all OnlyEQ settings?", isPresented: $confirmReset) {
+        .confirmationDialog("Reset OnlyEQ?", isPresented: $confirmReset) {
             Button("Reset Everything", role: .destructive) { resetAll() }
         } message: {
             Text("Presets, device profiles, and preferences will be removed.")

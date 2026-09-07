@@ -19,8 +19,8 @@ enum PresetImporter {
 
         var errorDescription: String? {
             switch self {
-            case .unrecognized: "Unrecognized EQ format. Supported: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac."
-            case .empty: "No EQ filters found in the input."
+            case .unrecognized: "This doesn’t look like an EQ preset. Paste the filter lines from AutoEq, Equalizer APO, peqdb, Wavelet, Poweramp, OPRA, Peace, REW, or eqMac."
+            case .empty: "No filters found. Each filter line needs a frequency, gain, and Q, like “Filter 1: ON PK Fc 1000 Hz Gain -3.0 dB Q 1.41”."
             }
         }
     }
