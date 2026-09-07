@@ -18,7 +18,7 @@ The menu-bar popover (`Sources/OnlyEQ/UI/PopoverView.swift`), Operate. The daily
 
 ## Chosen direction
 
-Two-pane instrument (surface seed 1512465f, candidate 7 of 7). The plot fills the left pane at full height with the status pill in its corner; the right column reads as the signal path: OnlyEQ and its switch, output device with volume, preset with binding caption and Bypass | Crossfeed, then Import…, Equalizer, and the gear. The panel uses the system menu-bar material (Liquid Glass on macOS 26, popover vibrancy before). The memorable moment: pressing Bypass empties the plot to the grey input spectrum, so hearing it flat and seeing it flat are one act.
+Curve-first stack (surface seed 1512465f rolled candidate 7, the two-pane form; the user chose candidate 2, the stack). The plot spans the full width under the name and switch with the status pill in its corner; the controls follow beneath and read as the signal path: OnlyEQ and its switch, output device with volume, preset with binding caption and Bypass | Crossfeed, then Import…, Equalizer, and the gear. The panel uses the system menu-bar material (Liquid Glass on macOS 26, popover vibrancy before). The memorable moment: pressing Bypass empties the plot to the grey input spectrum, so hearing it flat and seeing it flat are one act.
 
 ## Unresolved
 

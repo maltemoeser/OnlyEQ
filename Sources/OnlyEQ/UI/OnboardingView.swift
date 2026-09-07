@@ -61,9 +61,7 @@ struct OnboardingView: View {
             VStack(spacing: 4) {
                 EQCurveView(bands: Self.sampleBands, preampDB: 0, showSpectrum: false, rangeDB: 12)
                     .frame(height: 150)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035)))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .plotWell()
                 FrequencyAxisLabels()
             }
             .padding(.top, 24)

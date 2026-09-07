@@ -296,6 +296,7 @@ struct ImportSheet: View {
                 Text(preview.name).font(.callout.weight(.semibold)).lineLimit(1)
                 EQCurveView(bands: preview.bands, preampDB: 0, showSpectrum: false, rangeDB: preview.displayRangeDB)
                     .frame(height: 110)
+                    .plotWell()
                 Grid(alignment: .leading, verticalSpacing: 3) {
                     GridRow {
                         Text("Preamp").foregroundStyle(.secondary)
@@ -366,6 +367,7 @@ struct ImportSheet: View {
                 }
                 EQCurveView(bands: staged.preset.bands, preampDB: 0, showSpectrum: false, rangeDB: staged.preset.displayRangeDB)
                     .frame(height: 80)
+                    .plotWell()
                 ForEach(staged.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)

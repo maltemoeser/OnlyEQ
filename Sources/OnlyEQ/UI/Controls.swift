@@ -149,6 +149,22 @@ struct SearchField: NSViewRepresentable {
     }
 }
 
+/// The one surface the app draws: a 3.5 % tint with an 8 % hairline at a
+/// 10 pt continuous corner. Every plot outside the editor's canvas sits in
+/// it, and the import drop zone borrows it.
+struct PlotWell: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035)))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+extension View {
+    func plotWell() -> some View { modifier(PlotWell()) }
+}
+
 /// Wordmark as a small rounded badge, used wherever the app names itself.
 struct AppBadge: View {
     var size: CGFloat = 22

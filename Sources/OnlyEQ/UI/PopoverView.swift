@@ -1,42 +1,51 @@
 import SwiftUI
 
-// DIRECTION CONTRACT (surface seed 1512465f, structure 7 of 7)
+// DIRECTION CONTRACT (surface seed 1512465f; the user pinned the stacked
+//   form over the rolled two-pane one)
 // THESIS: The curve is the product, so the popover is one instrument rather
-//   than a stack of cards. The live response fills the left pane at full
-//   height; the controls stand in one column beside it and read top to
-//   bottom as the signal path. Refused: header, three same-size cards, footer.
+//   than a stack of cards. The live response spans the full width under the
+//   name and switch; the controls follow beneath it and read top to bottom
+//   as the signal path. Refused: three same-size cards.
 // OWN-WORLD: macOS itself. The system's menu-bar material, the system accent,
 //   San Francisco, native menus and bordered buttons. The only chromatic mark
 //   is the accent curve breathing over the grey input spectrum. No cards:
 //   rows are separated by space; the plot alone sits in a hairline well, the
-//   one surface the app draws, and every plot in the app sits in the same one.
+//   one surface the app draws. Every plot outside the editor's canvas sits in
+//   the same one.
 // STORY: Open, watch the curve under the music, see which device and preset
 //   are live, flip Bypass to hear it flat, close. Editing happens elsewhere.
-// FIRST VIEWPORT: 560 × 272 pt. Left, 288 pt: the plot with its axis and a
-//   status pill in the corner. Right, 230 pt: OnlyEQ and its switch; output
+// FIRST VIEWPORT: 360 pt wide, about 430 tall. OnlyEQ and its switch; the
+//   plot, 150 pt, with its axis and a status pill in the corner; output
 //   device with volume; preset with its device binding and Bypass |
 //   Crossfeed; Import…, Equalizer, and the gear at the bottom.
-// FORM: two-pane popover, candidate 7 of the grounded list, key 1512465f.
+// FORM: curve-first stack, candidate 2 of the grounded list, chosen by the
+//   user over the rolled candidate 7 (key 1512465f).
 // FINISH: unreviewed and undocumented is unfinished; this build ends with
 //   the finish review, the verdict, and DESIGN.md.
 
-/// Main menu-bar popover: the live curve on the left, one column of controls
-/// on the right.
+/// Main menu-bar popover: name and switch, the live curve, then the controls
+/// in signal order.
 struct PopoverView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showLatency") private var showLatency = true
 
-    static let width: CGFloat = 560
-    static let minHeight: CGFloat = 272
+    static let width: CGFloat = 360
+    static let minHeight: CGFloat = 420
     static let cornerRadius: CGFloat = 14
+    static let plotHeight: CGFloat = 150
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
+            header
             curvePane
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            controlColumn
-                .frame(width: 230)
+            Group {
+                deviceRow
+                presetRow
+            }
+            .disabled(!state.isEnabled)
+            .opacity(state.isEnabled ? 1 : 0.45)
+            footer
         }
         .padding(14)
         // Sized once when shown so the host panel never resizes while open;
@@ -67,10 +76,9 @@ struct PopoverView: View {
                         .padding(8)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035)))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.plotHeight)
+            .plotWell()
             FrequencyAxisLabels(compact: true)
                 .padding(.horizontal, 1)
         }
@@ -189,21 +197,7 @@ struct PopoverView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Control column
-
-    private var controlColumn: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
-            Group {
-                deviceRow
-                presetRow
-            }
-            .disabled(!state.isEnabled)
-            .opacity(state.isEnabled ? 1 : 0.45)
-            Spacer(minLength: 0)
-            footer
-        }
-    }
+    // MARK: - Controls
 
     private var header: some View {
         HStack(spacing: 8) {
