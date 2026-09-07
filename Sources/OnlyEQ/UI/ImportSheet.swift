@@ -408,36 +408,70 @@ struct ImportSheet: View {
     }
 }
 
-/// Wrapping row of small gray capsule labels.
+/// Wrapping row of small gray capsule labels, wrapped by available width.
 struct FlowPills: View {
     var items: [String]
 
     var body: some View {
-        VStack(spacing: 4) {
-            ForEach(rows, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(row, id: \.self) { item in
-                        Text(item)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().fill(.quaternary.opacity(0.6)))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        FlowLayout(spacing: 4) {
+            ForEach(items, id: \.self) { item in
+                Text(item)
+                    .font(.caption2.weight(.medium))
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Capsule().fill(.quaternary.opacity(0.6)))
+                    .foregroundStyle(.secondary)
             }
         }
     }
+}
 
-    private var rows: [[String]] {
-        var result: [[String]] = []
-        var current: [String] = []
-        for (i, item) in items.enumerated() {
-            current.append(item)
-            if current.count == 5 || i == items.count - 1 {
-                result.append(current)
-                current = []
+/// Lays subviews out left to right, starting a new centred row when the next
+/// one would not fit the proposed width.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX + (bounds.width - row.width) / 2
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+                                      proposal: .unspecified)
+                x += size.width + spacing
             }
+            y += row.height + spacing
         }
-        return result
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for (index, subview) in subviews.enumerated() {
+            let size = subview.sizeThatFits(.unspecified)
+            let needed = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.indices.isEmpty, needed > width {
+                rows.append(row)
+                row = Row()
+            }
+            row.indices.append(index)
+            row.width = row.indices.count == 1 ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+        }
+        if !row.indices.isEmpty { rows.append(row) }
+        return rows
     }
 }
