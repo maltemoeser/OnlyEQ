@@ -65,14 +65,10 @@ struct EditorView: View {
                         state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
                     }
                 }
-                if !state.store.customPresets.isEmpty {
+                if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
                     Divider()
-                    Menu("Delete Preset") {
-                        ForEach(state.store.customPresets) { preset in
-                            Button(preset.name, role: .destructive) {
-                                WindowManager.shared.confirmDeletePreset(preset)
-                            }
-                        }
+                    Button("Delete “\(stored.name)”…", role: .destructive) {
+                        WindowManager.shared.confirmDeletePreset(stored)
                     }
                 }
             } label: {
@@ -294,14 +290,6 @@ struct EditorView: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(1)
             Spacer()
-            Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
-                .toggleStyle(AccentSwitchStyle(width: 30))
-                .fixedSize(horizontal: true, vertical: false)
-                .layoutPriority(2)
-            Toggle("Limiter", isOn: $state.limiterEnabled)
-                .toggleStyle(AccentSwitchStyle(width: 30))
-                .fixedSize(horizontal: true, vertical: false)
-                .layoutPriority(2)
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
