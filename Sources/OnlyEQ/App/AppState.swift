@@ -574,6 +574,32 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Undo
+
+    /// Runs `change` against the working preset and registers the inverse with
+    /// the editor window's undo manager, so Command-Z puts the preset back the
+    /// way it was. Changes that leave the preset equal register nothing.
+    func recordingUndo(_ actionName: String, _ undoManager: UndoManager?, _ change: () -> Void) {
+        let before = preset
+        change()
+        guard preset != before else { return }
+        registerUndo(restoring: before, actionName: actionName, undoManager: undoManager)
+    }
+
+    /// Registers one undo step that restores `snapshot`. A drag calls this once
+    /// at its end with the preset from before the drag, so a whole drag undoes
+    /// as one step instead of one per mouse move.
+    func registerUndo(restoring snapshot: EQPreset, actionName: String, undoManager: UndoManager?) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { state in
+            let current = state.preset
+            state.apply(snapshot)
+            state.flushWorkingPresetPersistence()
+            state.registerUndo(restoring: current, actionName: actionName, undoManager: undoManager)
+        }
+        undoManager.setActionName(actionName)
+    }
+
     // MARK: - A/B
 
     func storeABAndSwitch(to slot: Int) {

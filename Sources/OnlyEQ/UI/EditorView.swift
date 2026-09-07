@@ -16,11 +16,14 @@ struct EditorView: View {
     var initialProfileSuggestion: ProfileSuggestion?
 
     @EnvironmentObject var state: AppState
+    @Environment(\.undoManager) private var undoManager
     @State private var selectedBandID: UUID?
     @State private var importPresentation: ImportPresentation?
     @State private var showSaveSheet = false
     @State private var saveName = ""
     @State private var handledInitialImport = false
+    /// The preset as it was when a node drag began; one undo step per drag.
+    @State private var dragStartPreset: EQPreset?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,6 +44,7 @@ struct EditorView: View {
             ImportSheet(profileSuggestion: presentation.profileSuggestion).environmentObject(state)
         }
         .sheet(isPresented: $showSaveSheet) { saveSheet }
+        .onDeleteCommand { deleteSelectedBand() }
         .onReceive(Self.importRequested) { suggestion in
             importPresentation = ImportPresentation(profileSuggestion: suggestion)
         }
@@ -57,13 +61,17 @@ struct EditorView: View {
         HStack(spacing: 10) {
             Menu {
                 ForEach(state.store.allPresets) { preset in
-                    Button(preset.name) { state.apply(preset) }
+                    Button(preset.name) {
+                        state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
+                    }
                 }
                 if !state.store.customPresets.isEmpty {
                     Divider()
                     Menu("Delete Preset") {
                         ForEach(state.store.customPresets) { preset in
-                            Button(preset.name, role: .destructive) { state.store.delete(preset) }
+                            Button(preset.name, role: .destructive) {
+                                WindowManager.shared.confirmDeletePreset(preset)
+                            }
                         }
                     }
                 }
@@ -79,7 +87,9 @@ struct EditorView: View {
             .keyboardShortcut("s", modifiers: .command)
             .help("Save the current curve as a preset")
 
-            Button("Revert") { state.revertPreset() }
+            Button("Revert") {
+                state.recordingUndo("Revert", undoManager) { state.revertPreset() }
+            }
                 .disabled(!state.presetIsModified)
                 .help("Discard edits and return to the saved preset")
 
@@ -154,17 +164,19 @@ struct EditorView: View {
                 selectedBandID: $selectedBandID,
                 onBandChange: { id, f, g in
                     guard let i = state.preset.bands.firstIndex(where: { $0.id == id }) else { return }
+                    if dragStartPreset == nil { dragStartPreset = state.preset }
                     state.preset.bands[i].frequency = f
                     state.preset.bands[i].gain = g
                 },
                 onBandDragEnded: {
+                    if let before = dragStartPreset, before != state.preset {
+                        state.registerUndo(restoring: before, actionName: "Move Band", undoManager: undoManager)
+                    }
+                    dragStartPreset = nil
                     state.flushWorkingPresetPersistence()
                 },
                 onAddBand: { f, g in
-                    guard state.preset.bands.count < 32 else { return }
-                    let band = EQBand(type: .peak, frequency: f, gain: g, q: 1.41)
-                    state.preset.bands.append(band)
-                    selectedBandID = band.id
+                    addBand(EQBand(type: .peak, frequency: f, gain: g, q: 1.41))
                 }
             )
             .frame(minHeight: 220, maxHeight: .infinity)
@@ -199,17 +211,19 @@ struct EditorView: View {
                 ForEach(Array(state.preset.bands.enumerated()), id: \.element.id) { index, band in
                     BandCard(index: index, band: bandBinding(band.id),
                              isSelected: selectedBandID == band.id,
-                             onDelete: { state.preset.bands.removeAll { $0.id == band.id } })
+                             onDelete: { deleteBand(band.id) })
                         .onTapGesture { selectedBandID = band.id }
                 }
                 Button {
-                    state.preset.bands.append(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
+                    addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 16))
                         .frame(width: 44, height: 100)
                 }
                 .buttonStyle(.plain)
+                .help("Add band")
+                .accessibilityLabel("Add band")
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
@@ -226,11 +240,28 @@ struct EditorView: View {
         Binding(
             get: { state.preset.bands.first { $0.id == id } ?? EQBand() },
             set: { newValue in
-                if let i = state.preset.bands.firstIndex(where: { $0.id == id }) {
-                    state.preset.bands[i] = newValue
-                }
+                guard let i = state.preset.bands.firstIndex(where: { $0.id == id }) else { return }
+                state.recordingUndo("Edit Band", undoManager) { state.preset.bands[i] = newValue }
             }
         )
+    }
+
+    private func addBand(_ band: EQBand) {
+        guard state.preset.bands.count < 32 else { return }
+        state.recordingUndo("Add Band", undoManager) { state.preset.bands.append(band) }
+        selectedBandID = band.id
+    }
+
+    private func deleteBand(_ id: UUID) {
+        state.recordingUndo("Delete Band", undoManager) {
+            state.preset.bands.removeAll { $0.id == id }
+        }
+        if selectedBandID == id { selectedBandID = nil }
+    }
+
+    private func deleteSelectedBand() {
+        guard let id = selectedBandID else { return }
+        deleteBand(id)
     }
 
     // MARK: - Bottom bar
@@ -245,7 +276,9 @@ struct EditorView: View {
             ManualPreampControl(
                 value: Binding(
                     get: { state.preset.preampDB },
-                    set: { state.preset.preampDB = $0 }
+                    set: { value in
+                        state.recordingUndo("Change Preamp", undoManager) { state.preset.preampDB = value }
+                    }
                 ),
                 effectiveValue: state.effectivePreampDB,
                 isDisabled: state.autoPreampEnabled,
@@ -278,16 +311,31 @@ struct EditorView: View {
             .frame(width: 78, height: 14)
     }
 
+    /// A stored custom preset, other than the one being edited, that the typed
+    /// name would replace. Saving over the current preset's own name is a plain
+    /// save and warns nothing.
+    private var presetReplacedBySave: EQPreset? {
+        let name = saveName.trimmingCharacters(in: .whitespaces)
+        return state.store.customPresets.first { $0.name == name && $0.id != state.preset.id }
+    }
+
     private var saveSheet: some View {
         VStack(spacing: 12) {
             Text("Save Preset").font(.headline)
             TextField("Preset name", text: $saveName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 240)
+            if presetReplacedBySave != nil {
+                Label("A preset with this name exists and will be replaced.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 240, alignment: .leading)
+            }
             HStack {
                 Button("Cancel") { showSaveSheet = false }
-                Button("Save") {
-                    state.saveCurrentAsPreset(named: saveName.isEmpty ? "My Preset" : saveName)
+                Button(presetReplacedBySave == nil ? "Save" : "Replace") {
+                    state.saveCurrentAsPreset(named: saveName.trimmingCharacters(in: .whitespaces))
                     showSaveSheet = false
                 }
                 .keyboardShortcut(.defaultAction)
@@ -487,10 +535,15 @@ struct BandCard: View {
                 Button {
                     onDelete()
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tertiary)
+                .help("Delete band")
+                .accessibilityLabel("Delete band")
             }
             valueRow("Fc", value: $band.frequency, range: 20...20000, format: freqFormat, parse: parseFreq)
             valueRow("Gain", value: $band.gain, range: -12...12, format: { String(format: "%.1f dB", $0) },

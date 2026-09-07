@@ -64,7 +64,7 @@ OnlyEQ checks for signed updates automatically and installs them in the backgrou
 </p>
 
 - Live spectrum behind the curve: the untouched input in grey, the processed output in blue, so boosts and cuts show against what came in. Tilted so music reads flat, with meter-style attack and release.
-- Parametric EQ with a draggable curve editor. Peak, shelves, high/low pass, notch, band pass — as many bands as you want.
+- Parametric EQ with a draggable curve editor. Peak, shelves, high/low pass, notch, band pass — as many bands as you want. Every edit undoes with Cmd-Z.
 - Imports every headphone EQ format I could find: AutoEq, Equalizer APO, peqdb, Wavelet/GraphicEQ, Poweramp, OPRA, Peace, REW, eqMac. Drop a file, paste text, or search the peqdb and AutoEq databases from inside the app. Anything you apply is saved and stays in the preset picker.
 - Per-device profiles. Your headphone preset kicks in when the headphones connect; your speakers keep theirs.
 - Volume boost up to 200%, automatic preamp so boosted EQ doesn't clip, a limiter as a safety net, A/B compare, one-click bypass. Bypass keeps the preamp and matches loudness to the EQ'd signal, so the comparison is about tone instead of the louder side winning.

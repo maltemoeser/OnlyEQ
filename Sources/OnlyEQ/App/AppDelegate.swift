@@ -287,6 +287,21 @@ final class WindowManager {
         showEditor()
     }
 
+    /// Deleting a stored preset has no undo, so it asks first. Called from the
+    /// preset menus in the popover and the editor.
+    func confirmDeletePreset(_ preset: EQPreset) {
+        let alert = NSAlert()
+        alert.messageText = "Delete “\(preset.name)”?"
+        alert.informativeText = "The preset is removed from this Mac. Devices set to it fall back to no preset."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        AppState.shared.store.delete(preset)
+    }
+
     func showOnboarding() {
         if onboardingWindow == nil {
             let window = NSWindow(
