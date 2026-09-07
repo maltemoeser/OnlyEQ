@@ -18,10 +18,6 @@ final class AppState: ObservableObject {
     let onlineDB = OnlineDatabase()
     private let hardwareVolumeWriter = HardwareVolumeWriter()
 
-    /// Installed by the app delegate so device detection can request UI without
-    /// coupling the audio/state layer to a particular window implementation.
-    var onProfileSuggestion: ((ProfileSuggestion) -> Void)?
-
     // MARK: - Published state
 
     @Published var isEnabled: Bool = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true {
@@ -100,6 +96,10 @@ final class AppState: ObservableObject {
     @Published var bufferFrames: Int = UserDefaults.standard.object(forKey: "bufferFrames") as? Int ?? 256 {
         didSet { UserDefaults.standard.set(bufferFrames, forKey: "bufferFrames"); engine.setIOBufferFrames(bufferFrames) }
     }
+
+    /// An unrecognised Bluetooth output the popover offers to find a preset
+    /// for. Set once per device; cleared when acted on or dismissed.
+    @Published var pendingProfileSuggestion: ProfileSuggestion?
 
     @Published var autoSuggestHeadphoneProfiles: Bool = UserDefaults.standard.object(forKey: "autoSuggestHeadphoneProfiles") as? Bool ?? true {
         didSet { UserDefaults.standard.set(autoSuggestHeadphoneProfiles, forKey: "autoSuggestHeadphoneProfiles") }
@@ -456,15 +456,14 @@ final class AppState: ObservableObject {
               let device = currentDevice,
               device.isBluetooth,
               store.deviceProfiles[device.uid] == nil,
-              !suggestedDeviceUIDs.contains(device.uid),
-              let onProfileSuggestion else { return }
+              !suggestedDeviceUIDs.contains(device.uid) else { return }
 
         let query = HeadphoneNameMatcher.searchQuery(for: device.name)
         guard !query.isEmpty else { return }
         suggestedDeviceUIDs.insert(device.uid)
         UserDefaults.standard.set(Array(suggestedDeviceUIDs), forKey: "profileSuggestion.seenDeviceUIDs")
-        onProfileSuggestion(ProfileSuggestion(deviceUID: device.uid, deviceName: device.name,
-                                              searchQuery: query))
+        pendingProfileSuggestion = ProfileSuggestion(deviceUID: device.uid, deviceName: device.name,
+                                                     searchQuery: query)
     }
 
     private func restoreWorkingPresetForCurrentDevice(migrateLegacyPreset: Bool = false) {

@@ -23,9 +23,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appShortcutMonitor.start()
 
         let state = AppState.shared
-        state.onProfileSuggestion = { suggestion in
-            WindowManager.shared.showEditor(importing: true, profileSuggestion: suggestion)
-        }
         Log.write("app: state ready")
 
         let hosting = NSHostingController(

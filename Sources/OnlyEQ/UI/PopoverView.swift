@@ -32,6 +32,10 @@ struct PopoverView: View {
             header
             Group {
                 deviceCard
+                if let suggestion = state.pendingProfileSuggestion,
+                   suggestion.deviceUID == state.currentDevice?.uid {
+                    suggestionBanner(suggestion)
+                }
                 presetCard
                 if state.suspectedPermissionIssue {
                     permissionBanner
@@ -210,6 +214,36 @@ struct PopoverView: View {
         .help("Open the equalizer")
         .accessibilityLabel("EQ curve")
         .accessibilityHint("Opens the equalizer")
+    }
+
+    /// Replaces the old behaviour of opening the equalizer with an import
+    /// sheet the moment new headphones connect. The offer waits here instead.
+    private func suggestionBanner(_ suggestion: ProfileSuggestion) -> some View {
+        Card {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "headphones.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("New headphones")
+                        .font(.callout.weight(.semibold))
+                    Text("Find a preset tuned for \(suggestion.deviceName)?")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        Button("Find Preset") {
+                            state.pendingProfileSuggestion = nil
+                            WindowManager.shared.showEditor(importing: true, profileSuggestion: suggestion)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button("Not Now") { state.pendingProfileSuggestion = nil }
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 2)
+                }
+            }
+        }
     }
 
     private var permissionBanner: some View {
