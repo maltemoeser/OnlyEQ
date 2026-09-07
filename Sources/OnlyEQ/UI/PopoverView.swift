@@ -128,42 +128,62 @@ struct PopoverView: View {
 
     private var presetCard: some View {
         Card {
-            HStack(spacing: 8) {
-                Menu {
-                    ForEach(state.store.allPresets) { preset in
-                        Button(preset.name) { state.apply(preset) }
-                    }
-                    if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
-                        Divider()
-                        Button("Delete “\(stored.name)”…", role: .destructive) {
-                            WindowManager.shared.confirmDeletePreset(stored)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Menu {
+                        ForEach(state.store.allPresets) { preset in
+                            Button(preset.name) { state.apply(preset) }
+                        }
+                        if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
+                            Divider()
+                            Button("Delete “\(stored.name)”…", role: .destructive) {
+                                WindowManager.shared.confirmDeletePreset(stored)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(state.preset.name)
+                                .font(.body.weight(.medium))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.secondary)
                         }
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(state.preset.name)
-                            .font(.body.weight(.medium))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.secondary)
-                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(presetBindingCaption.map { "\($0). Choose a preset to use it on this device." } ?? "Preset")
+                    Spacer(minLength: 8)
+                    Toggle("Bypass", isOn: $state.bypassed)
+                        .help("Hear the unprocessed signal without changing the preset")
+                    Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
+                        .help("Blend a little of each channel into the other for headphones")
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize(horizontal: false, vertical: true)
-                .help(state.presetWasAutoApplied ? "Applied automatically for this device" : "Preset")
-                Spacer(minLength: 8)
-                Toggle("Bypass", isOn: $state.bypassed)
-                    .help("Hear the unprocessed signal without changing the preset")
-                Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
-                    .help("Blend a little of each channel into the other for headphones")
+                .toggleStyle(.button)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                // The binding that makes "set once" work is otherwise invisible
+                // here; name it under the preset.
+                if let caption = presetBindingCaption {
+                    Text(caption)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.leading, 2)
+                }
             }
-            .toggleStyle(.button)
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
+    }
+
+    /// "Auto on External Headphones" while the current preset is the one
+    /// stored for the current device; nil when the preset is only a stash.
+    private var presetBindingCaption: String? {
+        guard let device = state.currentDevice,
+              let profile = state.store.deviceProfiles[device.uid],
+              profile.presetID == state.preset.id else { return nil }
+        return profile.autoApply ? "Auto on \(device.name)" : "Saved for \(device.name)"
     }
 
     // MARK: - Curve preview
