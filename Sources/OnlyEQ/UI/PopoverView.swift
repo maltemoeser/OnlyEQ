@@ -325,7 +325,6 @@ struct PopoverView: View {
             Spacer(minLength: 0)
             AppGearMenu()
                 .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
                 .fixedSize()
         }
         .buttonStyle(.bordered)
