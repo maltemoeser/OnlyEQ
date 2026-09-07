@@ -92,6 +92,14 @@ struct EQPreset: Identifiable, Codable, Equatable {
     ]
 
     var isFlat: Bool { bands.allSatisfy { $0.gain == 0 } && preampDB == 0 }
+
+    /// Half-height of the curve display in dB: ±12 by default, widened in 6 dB
+    /// steps so an imported band beyond ±12 dB is drawn where it is instead
+    /// of pinned to the edge.
+    var displayRangeDB: Double {
+        let largest = bands.map { abs($0.gain) }.max() ?? 0
+        return max(12, (largest / 6).rounded(.up) * 6)
+    }
 }
 
 /// Preset + volume remembered per output device.

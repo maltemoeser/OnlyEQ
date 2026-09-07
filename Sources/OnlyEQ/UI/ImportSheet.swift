@@ -278,7 +278,7 @@ struct ImportSheet: View {
                 Spacer()
             } else if let preview = previewPreset {
                 Text(preview.name).font(.callout.weight(.semibold)).lineLimit(1)
-                EQCurveView(bands: preview.bands, preampDB: 0, showSpectrum: false)
+                EQCurveView(bands: preview.bands, preampDB: 0, showSpectrum: false, rangeDB: preview.displayRangeDB)
                     .frame(height: 110)
                 Grid(alignment: .leading, verticalSpacing: 3) {
                     GridRow {
@@ -347,7 +347,7 @@ struct ImportSheet: View {
                     Text("\(staged.preset.bands.count) filters recognized · \(staged.detectedFormat)")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                EQCurveView(bands: staged.preset.bands, preampDB: 0, showSpectrum: false)
+                EQCurveView(bands: staged.preset.bands, preampDB: 0, showSpectrum: false, rangeDB: staged.preset.displayRangeDB)
                     .frame(height: 80)
                 ForEach(staged.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
