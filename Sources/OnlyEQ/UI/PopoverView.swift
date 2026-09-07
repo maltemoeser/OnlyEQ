@@ -14,10 +14,12 @@ import SwiftUI
 //   the same one.
 // STORY: Open, watch the curve under the music, see which device and preset
 //   are live, flip Bypass to hear it flat, close. Editing happens elsewhere.
-// FIRST VIEWPORT: 360 pt wide, about 430 tall. OnlyEQ and its switch; the
-//   plot, 150 pt, with its axis and a status pill in the corner; Bypass |
-//   Crossfeed | Loudness under the axis; output device with volume; preset
-//   with its device binding; Import…, Equalizer, and the gear at the bottom.
+// FIRST VIEWPORT: 360 pt wide, about 400 tall. OnlyEQ and its switch; the
+//   plot, 150 pt, with its axis and a status pill in the corner; Bypass and
+//   Crossfeed as small toggles under the axis; output device with
+//   volume; preset with its "use automatically" checkbox; a hairline, then
+//   Open Equalizer… and the gear. The plot is the only bordered surface and
+//   the toggles the only bordered controls: everything else is text.
 // FORM: curve-first stack, candidate 2 of the grounded list, chosen by the
 //   user over the rolled candidate 7 (key 1512465f).
 // FINISH: unreviewed and undocumented is unfinished; this build ends with
@@ -31,24 +33,33 @@ struct PopoverView: View {
     @AppStorage("showLatency") private var showLatency = true
 
     static let width: CGFloat = 360
-    static let minHeight: CGFloat = 420
+    static let minHeight: CGFloat = 380
     static let cornerRadius: CGFloat = 14
     static let plotHeight: CGFloat = 150
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // Rhythm: tight inside a group (plot to axis to toggles), generous
+        // between groups, so the eye lands on the curve, then the rows.
+        VStack(alignment: .leading, spacing: 0) {
             header
+                .padding(.bottom, 10)
             curvePane
             Group {
                 listeningRow
+                    .padding(.top, 8)
                 deviceRow
+                    .padding(.top, 20)
                 presetRow
+                    .padding(.top, 16)
             }
             .disabled(!state.isEnabled)
             .opacity(state.isEnabled ? 1 : 0.45)
             footer
+                .padding(.top, 14)
         }
-        .padding(14)
+        .padding(.top, 14)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
         // Sized once when shown so the host panel never resizes while open;
         // it grows only with the system text size.
         .frame(width: Self.width, alignment: .top)
@@ -91,12 +102,15 @@ struct PopoverView: View {
         Button {
             WindowManager.shared.showEditor()
         } label: {
-            EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
+            // Bypass settles the curve onto 0 dB rather than blanking it:
+            // the one authored moment, and it says what bypass does.
+            EQCurveView(bands: state.preset.bands, preampDB: 0,
                         showSpectrum: state.isEnabled && state.popoverIsVisible,
-                        spectrumStyle: .normal, rangeDB: state.preset.displayRangeDB)
+                        spectrumStyle: .normal, rangeDB: state.preset.displayRangeDB,
+                        responseScale: state.bypassed ? 0 : 1)
                 .padding(.vertical, 1)
-                .opacity(state.bypassed ? 0.5 : 1)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
+                .opacity(state.bypassed ? 0.55 : 1)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: state.bypassed)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -232,7 +246,9 @@ struct PopoverView: View {
             .menuStyle(.borderlessButton)
             .fixedSize(horizontal: false, vertical: true)
             .help("Output device")
-        } detail: {
+            Spacer(minLength: 6)
+            // Volume mostly comes from the keyboard, so the slider is a
+            // small trailing control, not a second line.
             BoostSlider(
                 value: $state.userVolumePercent,
                 maxPercent: state.maxBoostPercent,
@@ -245,6 +261,8 @@ struct PopoverView: View {
                     }
                 }
             )
+        } detail: {
+            EmptyView()
         }
     }
 
@@ -254,8 +272,11 @@ struct PopoverView: View {
                 ForEach(state.store.allPresets) { preset in
                     Button(preset.name) { state.apply(preset) }
                 }
+                Divider()
+                Button("Import Preset…") {
+                    WindowManager.shared.showEditor(importing: true)
+                }
                 if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
-                    Divider()
                     Button("Delete “\(stored.name)”…", role: .destructive) {
                         WindowManager.shared.confirmDeletePreset(stored)
                     }
@@ -265,56 +286,48 @@ struct PopoverView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize(horizontal: false, vertical: true)
-            .help(presetBindingCaption.map { "\($0). Choose a preset to use it on this device." } ?? "Preset")
+            .help("Preset")
         } detail: {
-            VStack(alignment: .leading, spacing: 8) {
-                // The binding that makes "set once" work is otherwise
-                // invisible; name it under the preset, or offer it.
-                if let caption = presetBindingCaption, let device = state.currentDevice {
-                    // Binding is reversible where it was made.
-                    Menu {
-                        Button("Stop Using Automatically on \(device.name)") {
-                            state.unbindCurrentDevice()
-                        }
-                    } label: {
-                        Text(caption)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .help("This preset is applied whenever \(device.name) becomes the output.")
-                } else if let device = state.currentDevice {
-                    Button {
-                        state.bindPresetToCurrentDevice()
-                    } label: {
-                        Label("Use on \(device.name)", systemImage: "pin")
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("Apply this preset automatically whenever \(device.name) becomes the output")
-                }
+            // The binding that makes "set once" work is otherwise invisible;
+            // one checkbox both makes it and undoes it.
+            Toggle(isOn: presetBinding) {
+                Text(state.currentDevice.map { "Use automatically on \($0.name)" }
+                     ?? "Use automatically on this device")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
+            .toggleStyle(.checkbox)
+            .controlSize(.small)
+            .disabled(state.currentDevice == nil)
+            .help("Apply this preset whenever this device becomes the output")
         }
+    }
+
+    private var presetBinding: Binding<Bool> {
+        Binding(
+            get: {
+                guard let device = state.currentDevice,
+                      let profile = state.store.deviceProfiles[device.uid] else { return false }
+                return profile.autoApply && state.presetIsBoundToCurrentDevice
+            },
+            set: { on in
+                if on { state.bindPresetToCurrentDevice() } else { state.unbindCurrentDevice() }
+            }
+        )
     }
 
     /// The listening switches sit under the curve: Bypass empties the
     /// plot when pressed, so the control and its feedback stay together.
     private var listeningRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Toggle("Bypass", isOn: $state.bypassed)
                 .help("Hear the unprocessed signal without changing the preset")
             Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
                 .help("Blend a little of each channel into the other for headphones")
-            Toggle("Loudness", isOn: $state.loudnessEnabled)
-                .help("Raise bass and treble as the volume drops below your reference level")
         }
         .toggleStyle(.button)
         .buttonStyle(.bordered)
-        .controlSize(.regular)
-        .frame(maxWidth: .infinity)
+        .controlSize(.small)
     }
 
     private func menuLabel(_ name: String) -> some View {
@@ -324,46 +337,38 @@ struct PopoverView: View {
             .truncationMode(.middle)
     }
 
-    /// "Auto on External Headphones" while the current preset is the one
-    /// stored for the current device; nil when the preset is only a stash.
-    private var presetBindingCaption: String? {
-        guard let device = state.currentDevice,
-              let profile = state.store.deviceProfiles[device.uid],
-              state.presetIsBoundToCurrentDevice else { return nil }
-        return profile.autoApply ? "Auto on \(device.name)" : "Saved for \(device.name)"
-    }
-
     // MARK: - Footer
 
+    /// A hairline and a plain text button, the way Control Center modules
+    /// end in "Sound Settings…".
     private var footer: some View {
-        HStack(spacing: 6) {
-            Button {
-                WindowManager.shared.showEditor(importing: true)
-            } label: {
-                Label("Import…", systemImage: "square.and.arrow.down")
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 6) {
+                Button("Open Equalizer…") {
+                    WindowManager.shared.showEditor()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+                AppGearMenu()
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
             }
-            Button {
-                WindowManager.shared.showEditor()
-            } label: {
-                Label("Equalizer", systemImage: "slider.horizontal.3")
-            }
-            Spacer(minLength: 0)
-            AppGearMenu()
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+            .padding(.top, 8)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 }
 
-/// Volume slider: blue track to 100 %, orange boost zone beyond, tick at 100 %.
+/// Volume slider: accent track to 100 %, orange boost zone beyond, tick at
+/// 100 %; the readout turns orange in the boost zone.
 struct BoostSlider: View {
     @Binding var value: Double
     var maxPercent: Double
     var onPreview: (Double) -> Void = { _ in }
     var onEditingChanged: (_ editing: Bool) -> Void = { _ in }
-    private let knobDiameter: CGFloat = 15
+    private let knobDiameter: CGFloat = 13
+    private let trackWidth: CGFloat = 84
     @State private var trackedValue: Double?
     @State private var lastPreviewTime: TimeInterval = 0
     @State private var previewInterval: TimeInterval = 1.0 / 60.0
@@ -371,97 +376,82 @@ struct BoostSlider: View {
 
     var body: some View {
         let displayedValue = trackedValue ?? value
-        VStack(spacing: 3) {
-            HStack(spacing: 8) {
-                Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                    .accessibilityHidden(true)
+        HStack(spacing: 5) {
+            // The number appears while the value is changing, and stays
+            // while the output is boosted past 100 %.
+            if trackedValue != nil || displayedValue > 100 {
                 Text("\(Int(displayedValue.rounded()))%")
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-                    .accessibilityLabel("Output volume")
-                    .accessibilityValue("\(Int(displayedValue.rounded())) percent")
-                GeometryReader { geo in
-                    let width = geo.size.width
-                    let fraction = min(max(displayedValue / maxPercent, 0), 1)
-                    let hundred = min(100 / maxPercent, 1)
-                    let knobX = sliderPosition(for: fraction, width: width)
-                    let hundredX = sliderPosition(for: hundred, width: width)
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.primary.opacity(0.12)).frame(height: 5)
-                        Capsule().fill(Color.accentColor)
-                            .frame(width: displayedValue > 0 ? min(knobX, hundredX) : 0, height: 5)
-                        if displayedValue > 100 {
-                            Rectangle().fill(.orange)
-                                .frame(width: max(knobX - hundredX, 0), height: 5)
-                                .offset(x: hundredX)
-                        }
-                        // 100 % tick.
-                        if maxPercent > 100 {
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(Color.primary.opacity(0.35))
-                                .frame(width: 2, height: 9)
-                                .offset(x: hundredX - 1)
-                        }
-                        Circle()
-                            .fill(.white)
-                            .frame(width: knobDiameter, height: knobDiameter)
-                            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
-                            .offset(x: knobX - knobDiameter / 2)
-                    }
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .gesture(DragGesture(minimumDistance: 0)
-                        .onChanged { gesture in
-                            let updated = sliderValue(at: gesture.location.x, width: width)
-                            beginTrackingIfNeeded(at: updated)
-                            trackedValue = updated
-                            let now = ProcessInfo.processInfo.systemUptime
-                            if lastPreviewTime == 0 {
-                                previewInterval = DisplayRefreshRate.interval()
-                            }
-                            if lastPreviewTime == 0 || now - lastPreviewTime >= previewInterval {
-                                onPreview(updated)
-                                lastPreviewTime = now
-                            }
-                        }
-                        .onEnded { gesture in
-                            let updated = sliderValue(at: gesture.location.x, width: width)
-                            finishTracking(at: updated)
-                        })
-                    .overlay {
-                        ScrollWheelMonitor { deltaY, isPrecise in
-                            adjustFromScroll(deltaY: deltaY, isPrecise: isPrecise)
-                        }
-                    }
-                }
-                .frame(height: 18)
+                    .foregroundStyle(displayedValue > 100 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                    .frame(width: 28, alignment: .trailing)
+                    .accessibilityHidden(true)
             }
-            GeometryReader { geo in
-                let width = geo.size.width
-                let hundred = min(100 / maxPercent, 1)
-                ZStack(alignment: .topLeading) {
-                    Text("0%")
-                        .position(x: sliderPosition(for: 0, width: width), y: 5)
-                    if maxPercent > 100 {
-                        Text("100%")
-                            .position(x: sliderPosition(for: hundred, width: width), y: 5)
-                    }
-                    Text("\(Int(maxPercent))%")
-                        .position(x: sliderPosition(for: 1, width: width), y: 5)
-                }
+            Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .frame(width: 13)
+                .accessibilityHidden(true)
+            GeometryReader { geo in
+                let width = geo.size.width
+                let fraction = min(max(displayedValue / maxPercent, 0), 1)
+                let hundred = min(100 / maxPercent, 1)
+                let knobX = sliderPosition(for: fraction, width: width)
+                let hundredX = sliderPosition(for: hundred, width: width)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.12)).frame(height: 4)
+                    Capsule().fill(Color.accentColor)
+                        .frame(width: displayedValue > 0 ? min(knobX, hundredX) : 0, height: 4)
+                    if displayedValue > 100 {
+                        Rectangle().fill(.orange)
+                            .frame(width: max(knobX - hundredX, 0), height: 4)
+                            .offset(x: hundredX)
+                    }
+                    // 100 % tick.
+                    if maxPercent > 100 {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.primary.opacity(0.35))
+                            .frame(width: 2, height: 8)
+                            .offset(x: hundredX - 1)
+                    }
+                    Circle()
+                        .fill(.white)
+                        .frame(width: knobDiameter, height: knobDiameter)
+                        .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+                        .offset(x: knobX - knobDiameter / 2)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let updated = sliderValue(at: gesture.location.x, width: width)
+                        beginTrackingIfNeeded(at: updated)
+                        trackedValue = updated
+                        let now = ProcessInfo.processInfo.systemUptime
+                        if lastPreviewTime == 0 {
+                            previewInterval = DisplayRefreshRate.interval()
+                        }
+                        if lastPreviewTime == 0 || now - lastPreviewTime >= previewInterval {
+                            onPreview(updated)
+                            lastPreviewTime = now
+                        }
+                    }
+                    .onEnded { gesture in
+                        let updated = sliderValue(at: gesture.location.x, width: width)
+                        finishTracking(at: updated)
+                    })
+                .overlay {
+                    ScrollWheelMonitor { deltaY, isPrecise in
+                        adjustFromScroll(deltaY: deltaY, isPrecise: isPrecise)
+                    }
+                }
             }
-            .frame(height: 11)
-            // Match the icon + spacing + fixed percentage field + spacing
-            // above so 0%, 100%, and max stay under the actual track.
-            .padding(.leading, 68)
+            .frame(width: trackWidth, height: 16)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Output volume")
+        .accessibilityValue("\(Int(displayedValue.rounded())) percent")
+        .help("Output volume, \(Int(displayedValue.rounded())) %")
         .onDisappear {
             if let trackedValue { finishTracking(at: trackedValue) }
         }
