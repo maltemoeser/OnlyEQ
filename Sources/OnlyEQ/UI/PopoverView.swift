@@ -20,23 +20,22 @@ import SwiftUI
 //   leading and the curve a line over it, a vertical volume fader at its
 //   side, and a pill in the corner only when something is off (bypassed,
 //   waiting, error); Bypass and Crossfeed as small capsule toggles under the
-//   axis; the preset with its "use automatically" checkbox; the output
-//   device in regular weight beneath it; a hairline, then a bordered Open
-//   Equalizer… and the gear.
+//   axis with the output device as a text capsule pull-down at the row's end;
+//   the preset with its "use automatically" checkbox; a hairline, then a
+//   bordered Open Equalizer… and the gear.
 // FORM: curve-first stack, candidate 2 of the grounded list, chosen by the
 //   user over the rolled candidate 7 (key 1512465f).
 // FINISH: unreviewed and undocumented is unfinished; this build ends with
 //   the finish review, the verdict, and DESIGN.md.
 
-/// Main menu-bar popover: name and switch, the live curve, then the controls
-/// in signal order.
+/// Main menu-bar popover: name and switch, the live curve, the listening
+/// row with the output device, then the preset.
 struct PopoverView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showLatency") private var showLatency = true
 
     static let width: CGFloat = 360
-    static let minHeight: CGFloat = 380
     static let cornerRadius: CGFloat = 14
     static let plotHeight: CGFloat = 150
 
@@ -52,8 +51,6 @@ struct PopoverView: View {
                     .padding(.top, 8)
                 presetRow
                     .padding(.top, 18)
-                deviceRow
-                    .padding(.top, 12)
             }
             .disabled(!state.isEnabled)
             .opacity(state.isEnabled ? 1 : 0.45)
@@ -66,7 +63,6 @@ struct PopoverView: View {
         // Sized once when shown so the host panel never resizes while open;
         // it grows only with the system text size.
         .frame(width: Self.width, alignment: .top)
-        .frame(minHeight: Self.minHeight, alignment: .top)
         .onExitCommand {
             NotificationCenter.default.post(name: .onlyEQHideMenuPanel, object: nil)
         }
@@ -100,8 +96,8 @@ struct PopoverView: View {
                 FrequencyAxisLabels(compact: true)
                     .padding(.horizontal, 1)
             }
-            // Volume as a fader beside the plot, the readout on the well's
-            // top line and the speaker on the axis line.
+            // Volume as a fader beside the plot: the track matches the
+            // well's height and the readout sits on the axis line.
             BoostSlider(
                 value: $state.userVolumePercent,
                 maxPercent: state.maxBoostPercent,
@@ -257,7 +253,7 @@ struct PopoverView: View {
 
     /// The preset leads: it is what this app adds. Its binding sits under it.
     private var presetRow: some View {
-        IdentityRow(symbol: "slider.horizontal.3", symbolLabel: "Preset") {
+        IdentityRow(symbol: "waveform.path", symbolLabel: "Preset") {
             Menu {
                 ForEach(state.store.allPresets) { preset in
                     Button(preset.name) { state.apply(preset) }
@@ -306,46 +302,44 @@ struct PopoverView: View {
         )
     }
 
-    /// The output device follows in regular weight: where the sound goes,
-    /// not what the app does to it.
-    private var deviceRow: some View {
-        IdentityRow(symbol: state.currentDevice?.icon ?? "speaker.slash", symbolLabel: "Output device") {
-            Menu {
-                ForEach(state.devices) { device in
-                    Button {
-                        state.selectOutputDevice(device)
-                    } label: {
-                        if device.id == state.currentDevice?.id {
-                            Label(device.name, systemImage: "checkmark")
-                        } else {
-                            Text(device.name)
-                        }
+    /// The output device as a capsule pull-down at the row's trailing end:
+    /// where the sound goes, beside the switches that shape it.
+    private var deviceMenu: some View {
+        Menu {
+            ForEach(state.devices) { device in
+                Button {
+                    state.selectOutputDevice(device)
+                } label: {
+                    if device.id == state.currentDevice?.id {
+                        Label(device.name, systemImage: "checkmark")
+                    } else {
+                        Text(device.name)
                     }
                 }
-            } label: {
-                menuLabel(state.currentDevice?.name ?? "No Output Device", weight: .regular)
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize(horizontal: false, vertical: true)
-            .help("Output device")
-        } detail: {
-            EmptyView()
+        } label: {
+            Text(state.currentDevice?.name ?? "No Output Device")
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
+        .menuStyle(.button)
+        .help("Output device")
+        .accessibilityLabel("Output device")
+        .accessibilityValue(state.currentDevice?.name ?? "No Output Device")
     }
 
     /// The listening switches sit under the curve as capsules, kin to the
     /// status pill: Bypass settles the curve when pressed, so the control
-    /// and its feedback stay together.
+    /// and its feedback stay together. The device pull-down closes the row.
     private var listeningRow: some View {
         HStack(spacing: 6) {
-            Toggle(isOn: $state.bypassed) {
-                Label("Bypass", systemImage: "waveform.slash")
-            }
-            .help("Hear the unprocessed signal without changing the preset")
-            Toggle(isOn: $state.crossfeedEnabled) {
-                Label("Crossfeed", systemImage: "arrow.left.arrow.right")
-            }
-            .help("Blend a little of each channel into the other for headphones")
+            Toggle("Bypass", isOn: $state.bypassed)
+                .help("Hear the unprocessed signal without changing the preset")
+            Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
+                .help("Blend a little of each channel into the other for headphones")
+            Spacer(minLength: 6)
+            deviceMenu
+                .layoutPriority(-1)
         }
         .toggleStyle(.button)
         .buttonStyle(.bordered)
@@ -368,10 +362,8 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 6) {
-                Button {
+                Button("Open Equalizer…") {
                     WindowManager.shared.showEditor()
-                } label: {
-                    Label("Open Equalizer…", systemImage: "slider.horizontal.3")
                 }
                 .buttonStyle(.bordered)
                 Spacer(minLength: 0)
@@ -385,8 +377,9 @@ struct PopoverView: View {
 }
 
 /// Vertical volume fader beside the plot: accent to 100 %, orange boost zone
-/// above it, a tick at 100 %. The readout sits on top and turns orange in
-/// the boost zone; the speaker sits below on the axis line.
+/// above it, a tick at 100 %. The track spans the plot's full height so the
+/// knob reaches the plot's top line; the readout sits below on the axis
+/// line and turns orange in the boost zone.
 struct BoostSlider: View {
     @Binding var value: Double
     var maxPercent: Double
@@ -403,11 +396,6 @@ struct BoostSlider: View {
         let displayedValue = trackedValue ?? value
         let percent = Int(displayedValue.rounded())
         VStack(spacing: 4) {
-            Text("\(percent)%")
-                .font(.caption2.weight(.medium))
-                .monospacedDigit()
-                .foregroundStyle(displayedValue > 100 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                .frame(height: 12)
             GeometryReader { geo in
                 let height = geo.size.height
                 let fraction = min(max(displayedValue / maxPercent, 0), 1)
@@ -462,15 +450,20 @@ struct BoostSlider: View {
                     }
                 }
             }
-            Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Text(displayedValue == 0 ? "Off" : "\(percent)%")
+                .font(.caption2.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(displayedValue > 100 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .frame(height: 12)
         }
         .frame(width: Self.width)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Output volume")
         .accessibilityValue("\(percent) percent")
+        .accessibilityAdjustableAction { direction in
+            let step: Double = direction == .increment ? 5 : -5
+            finishTracking(at: min(max(displayedValue + step, 0), maxPercent))
+        }
         .help("Output volume, \(percent) %")
         .onDisappear {
             if let trackedValue { finishTracking(at: trackedValue) }
