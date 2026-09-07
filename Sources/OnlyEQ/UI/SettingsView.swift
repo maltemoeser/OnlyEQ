@@ -163,7 +163,7 @@ struct DeviceSettings: View {
                     .font(.subheadline)
             }
             .frame(maxWidth: 190)
-            Toggle("", isOn: Binding(
+            Toggle("Apply automatically on \(device.name)", isOn: Binding(
                 get: { profile?.autoApply ?? false },
                 set: { enabled in
                     state.store.setProfile(deviceUID: device.uid, deviceName: device.name,
@@ -221,7 +221,7 @@ struct ShortcutSettings: View {
                             .font(.system(.subheadline, design: .monospaced))
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(RoundedRectangle(cornerRadius: 5).fill(.quaternary.opacity(0.6)))
-                        Toggle("", isOn: Binding(
+                        Toggle(action.title, isOn: Binding(
                             get: { HotKeyManager.shared.isEnabled(action) },
                             set: { HotKeyManager.shared.setEnabled(action, $0) }
                         ))
@@ -259,7 +259,7 @@ struct SoundSettings: View {
                         }
                         Text(String(format: "%.1f dBFS", state.limiterCeilingDB))
                             .font(.subheadline.monospacedDigit())
-                            .frame(width: 64, alignment: .trailing)
+                            .frame(minWidth: 64, alignment: .trailing)
                     }
                 }
             }
@@ -282,7 +282,7 @@ struct SoundSettings: View {
                             }
                             Text(String(format: "%.1f dB", state.crossfeedLevelDB))
                                 .font(.subheadline.monospacedDigit())
-                                .frame(width: 64, alignment: .trailing)
+                                .frame(minWidth: 64, alignment: .trailing)
                         }
                         LabeledContent("Cutoff") {
                             Slider(value: $state.crossfeedCutoffHz, in: 400...1000, step: 10) {
@@ -290,7 +290,7 @@ struct SoundSettings: View {
                             }
                             Text(String(format: "%.0f Hz", state.crossfeedCutoffHz))
                                 .font(.subheadline.monospacedDigit())
-                                .frame(width: 64, alignment: .trailing)
+                                .frame(minWidth: 64, alignment: .trailing)
                         }
                     }
                 }

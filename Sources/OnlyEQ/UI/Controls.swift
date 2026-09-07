@@ -8,6 +8,7 @@ import SwiftUI
 /// VoiceOver as the Toggle it stands in for, so it behaves like the real
 /// control and not like a picture of one.
 struct AccentSwitchStyle: ToggleStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var width: CGFloat = 34
 
     func makeBody(configuration: Configuration) -> some View {
@@ -23,7 +24,7 @@ struct AccentSwitchStyle: ToggleStyle {
                         .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
                         .padding(1.5)
                 }
-                .animation(.easeOut(duration: 0.12), value: configuration.isOn)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isOn)
                 .contentShape(Capsule())
                 .onTapGesture { configuration.isOn.toggle() }
                 .focusable()

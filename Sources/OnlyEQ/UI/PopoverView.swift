@@ -24,6 +24,7 @@ struct Card<Content: View>: View {
 /// volume, preset card, curve preview, footer.
 struct PopoverView: View {
     @EnvironmentObject var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showLatency") private var showLatency = true
 
     var body: some View {
@@ -168,21 +169,27 @@ struct PopoverView: View {
     // MARK: - Curve preview
 
     private var curvePreview: some View {
-        Card {
-            VStack(spacing: 5) {
-                EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
-                            showSpectrum: state.isEnabled && state.popoverIsVisible,
-                            spectrumStyle: .subtle, rangeDB: state.preset.displayRangeDB)
-                    .frame(height: 116)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .opacity(state.bypassed ? 0.5 : 1)
-                    .animation(.easeInOut(duration: 0.15), value: state.bypassed)
-                FrequencyAxisLabels(compact: true)
+        Button {
+            WindowManager.shared.showEditor()
+        } label: {
+            Card {
+                VStack(spacing: 5) {
+                    EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
+                                showSpectrum: state.isEnabled && state.popoverIsVisible,
+                                spectrumStyle: .subtle, rangeDB: state.preset.displayRangeDB)
+                        .frame(height: 116)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .opacity(state.bypassed ? 0.5 : 1)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
+                    FrequencyAxisLabels(compact: true)
+                }
             }
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
-        .onTapGesture { WindowManager.shared.showEditor() }
+        .buttonStyle(.plain)
         .help("Open the editor")
+        .accessibilityLabel("EQ curve")
+        .accessibilityHint("Opens the editor")
     }
 
     private var permissionBanner: some View {

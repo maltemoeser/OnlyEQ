@@ -64,6 +64,34 @@ struct EQBand: Identifiable, Codable, Equatable, Hashable {
         hasher.combine(q)
         hasher.combine(isEnabled)
     }
+
+    /// One keyboard step: up/down change gain by 0.5 dB, left/right move
+    /// frequency by a semitone. Fine steps are 0.1 dB and a quarter semitone.
+    enum NudgeDirection { case up, down, left, right }
+
+    func nudged(_ direction: NudgeDirection, fine: Bool) -> EQBand {
+        var band = self
+        switch direction {
+        case .up, .down:
+            let step = fine ? 0.1 : 0.5
+            let gain = self.gain + (direction == .up ? step : -step)
+            band.gain = min(max((gain * 10).rounded() / 10, -30), 30)
+        case .left, .right:
+            let semitones = fine ? 0.25 : 1.0
+            let factor = pow(2, semitones / 12)
+            let frequency = direction == .right ? self.frequency * factor : self.frequency / factor
+            band.frequency = min(max(frequency.rounded(), 20), 20000)
+        }
+        return band
+    }
+
+    /// Spoken value for the band's graph handle.
+    var accessibilityValue: String {
+        let frequency = self.frequency >= 1000
+            ? String(format: "%.2f kilohertz", self.frequency / 1000)
+            : String(format: "%.0f hertz", self.frequency)
+        return String(format: "%@, %.1f dB, Q %.2f%@", frequency, gain, q, isEnabled ? "" : ", disabled")
+    }
 }
 
 struct EQPreset: Identifiable, Codable, Equatable {
