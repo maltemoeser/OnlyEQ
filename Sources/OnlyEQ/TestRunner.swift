@@ -35,6 +35,7 @@ enum TestRunner {
             windowUndoRoutingTests()
             displayRangeTests()
             bandColorTests()
+            bandNudgeTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -619,6 +620,20 @@ enum TestRunner {
         expect(preset(12).displayRangeDB == 12, "a 12 dB band still fits ±12")
         expect(preset(-15.2).displayRangeDB == 18, "a −15 dB band widens to ±18")
         expect(preset(4, 25).displayRangeDB == 30, "a 25 dB band widens to ±30")
+    }
+
+    private static func bandNudgeTests() {
+        let band = EQBand(type: .peak, frequency: 1000, gain: 0, q: 1)
+        expect(band.nudged(.up, fine: false).gain == 0.5, "up nudges gain by 0.5 dB")
+        expect(band.nudged(.down, fine: true).gain == -0.1, "option-down nudges gain by 0.1 dB")
+        expect(band.nudged(.right, fine: false).frequency == 1059, "right moves a semitone up")
+        expect(band.nudged(.left, fine: false).frequency == 944, "left moves a semitone down")
+        expect(band.nudged(.right, fine: true).frequency == 1015, "option-right moves a quarter semitone")
+        let loud = EQBand(type: .peak, frequency: 19900, gain: 29.8, q: 1)
+        expect(loud.nudged(.up, fine: false).gain == 30, "gain clamps at +30 dB")
+        expect(loud.nudged(.right, fine: false).frequency == 20000, "frequency clamps at 20 kHz")
+        expect(band.nudged(.up, fine: false) != band, "a nudge changes the band value, so it registers undo")
+        expect(band.accessibilityValue == "1.00 kilohertz, 0.0 dB, Q 1.00", "spoken value names frequency, gain, and Q")
     }
 
     /// Band colours are identity, not position: they survive deletes, are

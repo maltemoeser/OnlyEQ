@@ -219,8 +219,9 @@ struct EQCurveView: View {
 
     @ViewBuilder
     private func nodeLayer(size: CGSize) -> some View {
-        ForEach(bands) { band in
+        ForEach(Array(bands.enumerated()), id: \.element.id) { index, band in
             DraggableBandNode(
+                number: index + 1,
                 band: band,
                 size: size,
                 rangeDB: rangeDB,
@@ -427,6 +428,7 @@ private final class SpectrumBarsNSView: NSView {
 /// so a high-polling-rate mouse cannot rebuild the entire editor hundreds of
 /// times per second.
 private struct DraggableBandNode: View {
+    let number: Int
     let band: EQBand
     let size: CGSize
     let rangeDB: Double
@@ -442,6 +444,21 @@ private struct DraggableBandNode: View {
 
     var body: some View {
         let isSelected = selectedBandID == band.id
+        handle(isSelected: isSelected)
+            .accessibilityElement()
+            .accessibilityLabel("Band \(number), \(band.type.displayName)")
+            .accessibilityValue(band.accessibilityValue)
+            .accessibilityHint("Adjust to change gain")
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .accessibilityAdjustableAction { direction in
+                selectedBandID = band.id
+                let nudged = band.nudged(direction == .increment ? .up : .down, fine: false)
+                onChange?(band.id, nudged.frequency, nudged.gain)
+                onEnded?()
+            }
+    }
+
+    private func handle(isSelected: Bool) -> some View {
         Circle()
             .fill(BandPalette.color(band.colorIndex ?? 0))
             .frame(width: isSelected ? 14 : 11, height: isSelected ? 14 : 11)

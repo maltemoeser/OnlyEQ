@@ -17,6 +17,8 @@ struct EditorView: View {
 
     @EnvironmentObject var state: AppState
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var focusedBandID: UUID?
     @State private var selectedBandID: UUID?
     @State private var importPresentation: ImportPresentation?
     @State private var showSaveSheet = false
@@ -45,6 +47,10 @@ struct EditorView: View {
         }
         .sheet(isPresented: $showSaveSheet) { saveSheet }
         .onDeleteCommand { deleteSelectedBand() }
+        .onMoveCommand { nudgeSelectedBand($0) }
+        .onChange(of: focusedBandID) { _, id in
+            if let id { selectedBandID = id }
+        }
         .onReceive(Self.importRequested) { suggestion in
             importPresentation = ImportPresentation(profileSuggestion: suggestion)
         }
@@ -179,7 +185,7 @@ struct EditorView: View {
             )
             .frame(minHeight: 220, maxHeight: .infinity)
             .opacity(state.bypassed ? 0.45 : 1)
-            .animation(.easeInOut(duration: 0.15), value: state.bypassed)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
                 Text("+\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
@@ -237,6 +243,8 @@ struct EditorView: View {
                                  isSelected: selectedBandID == band.id,
                                  onDelete: { deleteBand(band.id) })
                             .onTapGesture { selectedBandID = band.id }
+                            .focusable()
+                            .focused($focusedBandID, equals: band.id)
                             .id(band.id)
                     }
                     addBandButton
@@ -248,7 +256,7 @@ struct EditorView: View {
             // 32-band preset never hides the card being edited.
             .onChange(of: selectedBandID) { _, id in
                 guard let id else { return }
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
             }
         }
         .frame(height: 122)
@@ -298,6 +306,24 @@ struct EditorView: View {
     private func deleteSelectedBand() {
         guard let id = selectedBandID else { return }
         deleteBand(id)
+    }
+
+    /// Arrow keys move the selected band: up/down change gain by 0.5 dB,
+    /// left/right move frequency by a semitone. Option makes both steps fine.
+    private func nudgeSelectedBand(_ direction: MoveCommandDirection) {
+        guard let id = selectedBandID,
+              let i = state.preset.bands.firstIndex(where: { $0.id == id }) else { return }
+        let nudge: EQBand.NudgeDirection
+        switch direction {
+        case .up: nudge = .up
+        case .down: nudge = .down
+        case .left: nudge = .left
+        case .right: nudge = .right
+        @unknown default: return
+        }
+        let fine = NSEvent.modifierFlags.contains(.option)
+        let nudged = state.preset.bands[i].nudged(nudge, fine: fine)
+        state.recordingUndo("Nudge Band", undoManager) { state.preset.bands[i] = nudged }
     }
 
     // MARK: - Bottom bar
@@ -387,7 +413,7 @@ private struct ManualPreampControl: View {
         HStack(spacing: 12) {
             Text(String(format: "%.1f dB", trackedValue ?? effectiveValue))
                 .font(.subheadline.weight(.medium).monospacedDigit())
-                .frame(width: 52, alignment: .trailing)
+                .frame(minWidth: 52, alignment: .trailing)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
             Slider(
@@ -617,7 +643,7 @@ struct BandCard: View {
                           format: @escaping (Double) -> String,
                           parse: @escaping (String) -> Double?) -> some View {
         HStack(spacing: 4) {
-            Text(label).font(.caption2).foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
+            Text(label).font(.caption2).foregroundStyle(.secondary).frame(minWidth: 28, alignment: .leading)
             // The draft carries the exact unitless value so a band shown as
             // "1.5 kHz" edits as "1534", not "1.5" (which would parse as 1.5 Hz).
             EditableValueField(label: label, text: format(value.wrappedValue),
