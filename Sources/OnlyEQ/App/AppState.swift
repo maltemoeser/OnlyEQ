@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
 
     let engine = ProcessTapEngine()
     let store = PresetStore()
+    private var storeSubscription: AnyCancellable?
     let onlineDB = OnlineDatabase()
     private let hardwareVolumeWriter = HardwareVolumeWriter()
 
@@ -163,6 +164,11 @@ final class AppState: ObservableObject {
     // MARK: - Setup
 
     private init() {
+        // The popover observes AppState only; a profile or preset change in
+        // the store must redraw it too.
+        storeSubscription = store.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
         refreshDevices()
         handledDeviceUID = currentDevice?.uid
         restoreWorkingPresetForCurrentDevice(migrateLegacyPreset: true)
