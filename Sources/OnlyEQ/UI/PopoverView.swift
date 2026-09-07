@@ -15,9 +15,9 @@ import SwiftUI
 // STORY: Open, watch the curve under the music, see which device and preset
 //   are live, flip Bypass to hear it flat, close. Editing happens elsewhere.
 // FIRST VIEWPORT: 360 pt wide, about 430 tall. OnlyEQ and its switch; the
-//   plot, 150 pt, with its axis and a status pill in the corner; output
-//   device with volume; preset with its device binding and Bypass |
-//   Crossfeed; Import…, Equalizer, and the gear at the bottom.
+//   plot, 150 pt, with its axis and a status pill in the corner; Bypass |
+//   Crossfeed | Loudness under the axis; output device with volume; preset
+//   with its device binding; Import…, Equalizer, and the gear at the bottom.
 // FORM: curve-first stack, candidate 2 of the grounded list, chosen by the
 //   user over the rolled candidate 7 (key 1512465f).
 // FINISH: unreviewed and undocumented is unfinished; this build ends with
@@ -40,6 +40,7 @@ struct PopoverView: View {
             header
             curvePane
             Group {
+                listeningRow
                 deviceRow
                 presetRow
             }
@@ -269,32 +270,51 @@ struct PopoverView: View {
             VStack(alignment: .leading, spacing: 8) {
                 // The binding that makes "set once" work is otherwise
                 // invisible; name it under the preset, or offer it.
-                if let caption = presetBindingCaption {
-                    Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else if let device = state.currentDevice {
-                    Button("Use on \(device.name) automatically") {
-                        state.bindPresetToCurrentDevice()
+                if let caption = presetBindingCaption, let device = state.currentDevice {
+                    // Binding is reversible where it was made.
+                    Menu {
+                        Button("Stop Using Automatically on \(device.name)") {
+                            state.unbindCurrentDevice()
+                        }
+                    } label: {
+                        Text(caption)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(Color.accentColor)
-                    .lineLimit(1)
-                    .help("Apply this preset whenever \(device.name) becomes the output")
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("This preset is applied whenever \(device.name) becomes the output.")
+                } else if let device = state.currentDevice {
+                    Button {
+                        state.bindPresetToCurrentDevice()
+                    } label: {
+                        Label("Use on \(device.name)", systemImage: "pin")
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Apply this preset automatically whenever \(device.name) becomes the output")
                 }
-                HStack(spacing: 6) {
-                    Toggle("Bypass", isOn: $state.bypassed)
-                        .help("Hear the unprocessed signal without changing the preset")
-                    Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
-                        .help("Blend a little of each channel into the other for headphones")
-                }
-                .toggleStyle(.button)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
+    }
+
+    /// The listening switches sit under the curve: Bypass empties the
+    /// plot when pressed, so the control and its feedback stay together.
+    private var listeningRow: some View {
+        HStack(spacing: 8) {
+            Toggle("Bypass", isOn: $state.bypassed)
+                .help("Hear the unprocessed signal without changing the preset")
+            Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
+                .help("Blend a little of each channel into the other for headphones")
+            Toggle("Loudness", isOn: $state.loudnessEnabled)
+                .help("Raise bass and treble as the volume drops below your reference level")
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .frame(maxWidth: .infinity)
     }
 
     private func menuLabel(_ name: String) -> some View {

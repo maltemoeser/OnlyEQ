@@ -527,6 +527,13 @@ final class AppState: ObservableObject {
         store.setProfile(deviceUID: device.uid, deviceName: device.name, preset: preset, autoApply: true)
     }
 
+    /// The reverse of binding: the device keeps whatever is playing now but
+    /// nothing is applied for it on connect.
+    func unbindCurrentDevice() {
+        guard let device = currentDevice else { return }
+        store.removeProfile(deviceUID: device.uid)
+    }
+
     /// The stored preset the working preset came from, if it still exists.
     var savedPreset: EQPreset? { store.allPresets.first { $0.id == preset.id } }
 
