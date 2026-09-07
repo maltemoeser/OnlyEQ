@@ -74,7 +74,7 @@ private final class EQCurveResponseCache: ObservableObject {
 
 /// The hero EQ curve: log-frequency response with optional live spectrum bars
 /// behind it and optional draggable band nodes (editor mode).
-struct EQCurveView: View {
+struct EQCurveView: View, Animatable {
     enum SpectrumStyle {
         case normal, subtle
 
@@ -89,6 +89,9 @@ struct EQCurveView: View {
     var spectrumStyle: SpectrumStyle = .normal
     var showIndividualCurves = false
     var rangeDB: Double = 12
+    /// 1 draws the response, 0 draws it flat; animated across a bypass so
+    /// the curve settles onto the 0 dB line instead of vanishing.
+    var responseScale: Double = 1
     @Binding var selectedBandID: UUID?
     var onBandChange: ((UUID, _ frequency: Double, _ gain: Double) -> Void)?
     var onBandDragEnded: (() -> Void)?
@@ -97,9 +100,14 @@ struct EQCurveView: View {
 
     private let minF = 20.0, maxF = 20000.0
 
+    var animatableData: Double {
+        get { responseScale }
+        set { responseScale = newValue }
+    }
+
     init(bands: [EQBand], preampDB: Double, interactive: Bool = false, showSpectrum: Bool = true,
          spectrumStyle: SpectrumStyle = .normal,
-         showIndividualCurves: Bool = false, rangeDB: Double = 12,
+         showIndividualCurves: Bool = false, rangeDB: Double = 12, responseScale: Double = 1,
          selectedBandID: Binding<UUID?> = .constant(nil),
          onBandChange: ((UUID, Double, Double) -> Void)? = nil,
          onBandDragEnded: (() -> Void)? = nil,
@@ -111,6 +119,7 @@ struct EQCurveView: View {
         self.spectrumStyle = spectrumStyle
         self.showIndividualCurves = showIndividualCurves
         self.rangeDB = rangeDB
+        self.responseScale = responseScale
         self._selectedBandID = selectedBandID
         self.onBandChange = onBandChange
         self.onBandDragEnded = onBandDragEnded
@@ -176,7 +185,7 @@ struct EQCurveView: View {
     private func curvePoints(size: CGSize, data: EQCurveResponseCache.Data) -> [CGPoint] {
         zip(data.combinedFrequencies, data.combinedResponse).map {
             CGPoint(x: x(forFrequency: $0, size),
-                    y: y(forDB: min(max($1, -rangeDB), rangeDB), size))
+                    y: y(forDB: min(max($1 * responseScale, -rangeDB), rangeDB), size))
         }
     }
 

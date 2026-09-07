@@ -161,8 +161,9 @@ enum ScreenshotRenderer {
         window.contentViewController = hosting
         window.setContentSize(size)
         window.setFrameOrigin(NSPoint(x: -4000, y: -4000))
+        // Key but not activated: activating would steal focus from whatever
+        // the person is doing while the batch renders.
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
         // Let SwiftUI settle its layout and control states.
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 1.5))

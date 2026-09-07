@@ -83,18 +83,17 @@ struct IdentityRow<Menu: View, Detail: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.callout.weight(.medium))
+                    .font(.body)
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.primary.opacity(0.07)))
+                    .frame(width: 22)
                     .accessibilityLabel(symbolLabel)
                 menu
                 Spacer(minLength: 0)
             }
             detail
-                .padding(.leading, 38)
+                .padding(.leading, 30)
         }
     }
 }

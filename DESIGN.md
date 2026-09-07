@@ -9,7 +9,6 @@ colors:
   label-quaternary: "rgba(255,255,255,0.10)"
   well-fill: "rgba(255,255,255,0.035)"
   well-hairline: "rgba(255,255,255,0.08)"
-  symbol-circle: "rgba(255,255,255,0.07)"
   control-background: "#1e1e1e"
   separator: "rgba(255,255,255,0.10)"
   track-off: "rgba(255,255,255,0.18)"
@@ -133,10 +132,8 @@ components:
     rounded: "{rounded.keycap}"
     padding: "3px 8px"
   identity-symbol:
-    backgroundColor: "{colors.symbol-circle}"
     textColor: "{colors.label-secondary}"
-    rounded: "{rounded.pill}"
-    size: "28px"
+    size: "22px"
   app-badge:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.label}"
@@ -152,9 +149,9 @@ components:
 
 OnlyEQ should look like a utility Apple forgot to ship. Every colour is a system semantic colour that follows the user's accent and appearance; every typeface is San Francisco through the system text styles; every control is either a native SwiftUI control or a pixel-faithful stand-in for one. The app has no palette, no logo mark beyond an SF Symbol in an accent square, and no decoration. Brand lives in one place only: the frequency-response curve with the live spectrum breathing behind it, and the band palette that ties graph handles to their cards.
 
-The popover is one instrument, not a stack of cards. Under the name and its switch, the live response spans the full width inside a hairline well, with Bypass, Crossfeed, and Loudness in one row beneath it, and the controls follow, reading top to bottom as the signal path: output device with volume, preset with its device binding, then Import, Equalizer, and the gear. Rows are separated by space, not by boxes. The whole thing sits on the system's own menu-bar material in a 360 point wide panel at least 420 points tall that grows only with the system text size. The editor, Settings, onboarding, and the import sheet are ordinary macOS windows: a unified toolbar, toolbar-style settings tabs, a setup assistant with a Back and Continue footer, a sheet with a segmented picker.
+The popover is one instrument, not a stack of cards. Under the name and its switch, the live response spans the full width inside a hairline well, with Bypass and Crossfeed as two small toggles beneath it, and the controls follow, reading top to bottom as the signal path: output device with volume, then the preset with a checkbox that binds it to the device. A hairline and a plain Open Equalizer… button close the panel, the way a Control Center module ends. Rows are separated by space, not by boxes; the plot is the only bordered surface and the two toggles the only bordered controls. The whole thing sits on the system's own menu-bar material in a 360 point wide panel about 400 points tall that grows only with the system text size. The editor, Settings, onboarding, and the import sheet are ordinary macOS windows: a unified toolbar, toolbar-style settings tabs, a setup assistant with a Back and Continue footer, a sheet with a segmented picker.
 
-Motion is short, eased, and tied to a state change. A switch slides in 120 ms, bypass fades the plot in 150 ms, the band strip scrolls a selected card into view in 200 ms, and the spectrum attacks in 10 ms and releases over 400 ms. Every one of them is skipped under Reduce Motion, and that is the whole vocabulary.
+Motion is short, eased, and tied to a state change. A switch slides in 120 ms, bypass eases the response onto the 0 dB line over 350 ms while the plot dims, the band strip scrolls a selected card into view in 200 ms, and the spectrum attacks in 10 ms and releases over 400 ms. Every one of them is skipped under Reduce Motion, and that is the whole vocabulary.
 
 **Key Characteristics:**
 - System accent and system label colours only; the app never defines a hue of its own outside the band palette.
@@ -172,11 +169,10 @@ The palette is macOS itself; the tokens above are dark-appearance snapshots of d
 
 ### Neutral
 - **Label** (`.primary`): headings, values, menu labels, the plot's 0 dB line.
-- **Secondary Label** (`.secondary`): the workhorse for everything a person reads that is not a heading: captions, axis labels, form descriptions, the status pill text, the preset binding line, the input spectrum bars, and the circled symbols in the popover rows.
+- **Secondary Label** (`.secondary`): the workhorse for everything a person reads that is not a heading: captions, axis labels, form descriptions, the status pill text, the preset binding checkbox, the input spectrum bars, and the row symbols in the popover.
 - **Tertiary Label** (`.tertiary`): decoration only. Two uses: the dashed border of the add-band button and the delete glyph on a band card.
 - **Quaternary Label** (`.quaternary` at 50 to 60 %): the fill behind editable value fields and shortcut key caps.
 - **Well Fill** (`Color.primary` at 3.5 %) with **Well Hairline** (`Color.primary` at 8 %): the plot well, the one surface the app draws.
-- **Symbol Circle** (`Color.primary` at 7 %): the 28 pt circle behind the device and preset symbols in the popover.
 - **Control Background** and **Separator** (`NSColor.controlBackgroundColor`, `.separatorColor`): band cards in the editor.
 - **Track Off** (`Color.primary` at 18 %): a switch that is off. **Slider Track** (`Color.primary` at 12 %): the boost slider, with a 35 % tick at 100 %.
 - **Panel Material** (`NSGlassEffectView` regular on macOS 26, `NSVisualEffectView` `.popover` behind-window before): what stands between the popover and the desktop. Notices inside the plot well use `.background` at 60 % (status pill) and 85 % (headphone suggestion) so they read over the spectrum.
@@ -221,7 +217,7 @@ The palette is macOS itself; the tokens above are dark-appearance snapshots of d
 
 ## Layout
 
-The popover is one `VStack` at 14 pt spacing inside 14 pt padding, 360 pt wide and at least 420 pt tall. Top to bottom: the header (22 pt app badge, the name, the switch at the trailing edge), the plot well at a fixed 150 pt with the status pill in its top-trailing corner and the compact axis labels 4 pt beneath, the listening row (Bypass, Crossfeed, Loudness as regular-size button toggles, centred), the device row with the boost slider, the preset row with its binding line (a "Use on <device>" button, or an "Auto on <device>" menu whose one item removes the binding), and the footer (Import, Equalizer, and the gear menu with its system indicator). Each identity row is a 28 pt circled symbol, a 10 pt gap, a borderless menu, and its detail indented 38 pt underneath. The popover is sized once to its fitting size when shown, so the panel never resizes while open. It grows only with the system text size.
+The popover is one `VStack` inside 14 pt side padding, 360 pt wide and about 400 pt tall, with a spacing rhythm of tight inside a group and generous between groups: header, 10 pt, plot well at a fixed 150 pt with the status pill in its top-trailing corner and the compact axis labels 4 pt beneath, 8 pt, the listening row (Bypass and Crossfeed as small button toggles, leading-aligned), 20 pt, the device row with the boost slider at its trailing edge (a caption2 speaker and an 84 pt track with a 13 pt knob; the percentage appears while the value changes and stays, orange, above 100), 16 pt, the preset row with its "Use automatically on <device>" small checkbox, 14 pt, then a hairline and the footer (a plain Open Equalizer… button and the gear menu with its system indicator) 8 pt below it. Each identity row is a 22 pt secondary symbol, an 8 pt gap, a borderless menu, and its detail indented 30 pt underneath. The popover is sized once to its fitting size when shown, so the panel never resizes while open. It grows only with the system text size.
 
 The editor window opens at 840 by 560 pt with a minimum of 720 by 480. Its unified 52 pt title bar carries real toolbar items (preset menu, Save, Revert on the left; Bypass in the centre; Import and the gear on the right) and hides the window title. Below it: the Compare row, a divider, the graph filling the remaining height with 24 pt side margins, a 122 pt horizontally scrolling strip of 150 pt band cards at 8 pt spacing, a divider, and the Preamp bar. Everything in the editor shares the 24 pt horizontal margin.
 
@@ -240,7 +236,7 @@ Flat, by macOS convention. The popover panel has the system shadow and the syste
 
 ## Shapes
 
-Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot well and drop well, 8 pt for notices over the plot, and 27 % of the badge size for the app badge. Standard corners at 8 pt for band cards and the add-band button, 7 pt for the headphone-suggestion banner in the import sheet, 5 pt for shortcut key caps, and 4 pt for value fields. Switches, the status pill, slider tracks, and the circled row symbols are capsules or circles. Graph handles are 11 pt circles with a 1 pt white ring at 50 %, growing to 14 pt with a 2 pt ring at 90 % when selected. Hairlines are 1 pt at 8 % primary, or the system separator colour.
+Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot well and drop well, 8 pt for notices over the plot, and 27 % of the badge size for the app badge. Standard corners at 8 pt for band cards and the add-band button, 7 pt for the headphone-suggestion banner in the import sheet, 5 pt for shortcut key caps, and 4 pt for value fields. Switches, the status pill, and slider tracks are capsules. Graph handles are 11 pt circles with a 1 pt white ring at 50 %, growing to 14 pt with a 2 pt ring at 90 % when selected. Hairlines are 1 pt at 8 % primary, or the system separator colour.
 
 ## Components
 
@@ -254,10 +250,10 @@ Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot
 - A 34 by 20 pt capsule, accent when on, primary 18 % when off, white knob with a 25 % shadow, 1.5 pt inset, 120 ms ease-out slide. Drawn in SwiftUI so it renders in offscreen screenshots; it must stay indistinguishable from `NSSwitch`. Focusable, toggles on Space, and presents to VoiceOver as the Toggle it stands in for. Settings rows use the real `.switch` at `.mini`.
 
 ### Buttons
-- Native SwiftUI `.bordered` and `.borderedProminent`. Popover buttons are `.small`; onboarding footers are `.large`; toolbar items and sheet footers are the default size. Toggles that behave like buttons (Bypass, Crossfeed) use `.button` toggle style. A Compare slot is a bordered button tinted accent when selected. There is no custom button.
+- Native SwiftUI `.bordered` and `.borderedProminent`. Popover controls are `.small`; onboarding footers are `.large`; toolbar items and sheet footers are the default size. Toggles that behave like buttons (Bypass, Crossfeed) use `.button` toggle style; a setting that binds or unbinds (the preset's device binding) is a `.checkbox` toggle. The popover footer's Open Equalizer… is a `.plain` button in primary text under a hairline. A Compare slot is a bordered button tinted accent when selected. There is no custom button.
 
 ### Identity Row (`IdentityRow`)
-- A 28 pt circle at primary 7 % holding a callout-weight secondary SF Symbol, a 10 pt gap, a borderless-button menu with a body-medium label truncated in the middle, and a detail block indented 38 pt. Full width of the popover. The device row's detail is the boost slider; the preset row's is the binding caption plus Bypass and Crossfeed.
+- A 22 pt column holding a body-size secondary SF Symbol, an 8 pt gap, a borderless-button menu with a body-medium label truncated in the middle, and a detail block indented 30 pt. Full width of the popover. The device row's detail is the boost slider; the preset row's is the "Use automatically on <device>" checkbox.
 
 ### Status Pill
 - A capsule of `.background` at 60 % with 7 by 3 pt padding, a 6 pt dot (green active, secondary off or bypassed, orange waiting, red error), and caption2 medium secondary text with monospaced digits. Sits 8 pt inside the top-trailing corner of the popover plot.
@@ -272,7 +268,7 @@ Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot
 - 150 pt wide, 8 pt padding, control-background fill, separator hairline; the border becomes the band colour at 1.5 pt when selected; 50 % opacity when the band is disabled. Header: an 8 pt colour dot, the band number in caption semibold secondary, a borderless type menu, and a tertiary delete glyph. Three value rows below. The add-band button beside the strip is a 44 by 100 pt plain button with a tertiary 1 pt dashed border.
 
 ### Curve Editor (signature)
-- Log-frequency plot from 20 Hz to 20 kHz. Grid is 1 pt secondary at 12 % dashed 2/3 on octaves; the 0 dB line is 25 %. The composite response is a 2 pt accent stroke over a vertical accent gradient from 35 % to 3 %. In the editor each band draws its own response dashed 4/3 at 22 % in its palette colour. Behind everything, log-spaced spectrum bars in an AppKit layer: input in secondary label colour, output in accent, both at low alpha, with a 10 ms attack and 400 ms release on band power, a 45 ms interpolation at the display rate, and the output shifted by the static gain so only the filter shape shows. Bypass fades the plot to 45 to 50 % and hides the curve.
+- Log-frequency plot from 20 Hz to 20 kHz. Grid is 1 pt secondary at 12 % dashed 2/3 on octaves; the 0 dB line is 25 %. The composite response is a 2 pt accent stroke over a vertical accent gradient from 35 % to 3 %. In the editor each band draws its own response dashed 4/3 at 22 % in its palette colour. Behind everything, log-spaced spectrum bars in an AppKit layer: input in secondary label colour, output in accent, both at low alpha, with a 10 ms attack and 400 ms release on band power, a 45 ms interpolation at the display rate, and the output shifted by the static gain so only the filter shape shows. Bypass dims the plot to 55 % and eases the response onto the 0 dB line, so the curve settles flat rather than vanishing.
 
 ### Boost Slider
 - A 5 pt capsule track at primary 12 %, accent fill, a 2 by 9 pt tick at 100 %, a 15 pt white knob with a 35 % shadow, and the fill turns orange above unity. Tick labels (0 %, 100 %, max) in caption2 secondary sit under the track.
