@@ -270,7 +270,7 @@ struct SoundSettings: View {
                     Text("Blend a little of each channel into the other, as speakers do, so hard-panned recordings sound less split on headphones.")
                 }
                 if state.crossfeedEnabled {
-                    Picker("Preset", selection: $state.crossfeedPreset) {
+                    Picker("Profile", selection: $state.crossfeedPreset) {
                         ForEach(CrossfeedPreset.allCases) { preset in
                             Text(preset.title).tag(preset)
                         }

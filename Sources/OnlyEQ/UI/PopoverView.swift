@@ -132,14 +132,10 @@ struct PopoverView: View {
                     ForEach(state.store.allPresets) { preset in
                         Button(preset.name) { state.apply(preset) }
                     }
-                    if !state.store.customPresets.isEmpty {
+                    if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
                         Divider()
-                        Menu("Delete Preset") {
-                            ForEach(state.store.customPresets) { preset in
-                                Button(preset.name, role: .destructive) {
-                                    WindowManager.shared.confirmDeletePreset(preset)
-                                }
-                            }
+                        Button("Delete “\(stored.name)”…", role: .destructive) {
+                            WindowManager.shared.confirmDeletePreset(stored)
                         }
                     }
                 } label: {

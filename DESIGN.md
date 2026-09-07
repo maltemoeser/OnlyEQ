@@ -109,7 +109,7 @@ components:
 
 OnlyEQ should look like a utility Apple forgot to ship. Every colour is a system semantic colour that follows the user's accent and appearance; every typeface is San Francisco; every control is either a native SwiftUI control or a pixel-faithful stand-in for one. The app has no palette, no logo mark beyond an SF Symbol in an accent square, and no decoration. Brand lives in one place only: the frequency-response curve with the live spectrum breathing behind it, and the ten-colour band palette that ties graph handles to their cards.
 
-Density is high and steady. The popover is four cards and a footer in a fixed 360 by 410 point window; the editor is a graph, a strip of small band cards, and two thin bars of controls. Text sizes sit between 10 and 13 points, values are monospaced, and nothing bounces. Controls are precise and restrained: a switch slides in 120 ms, bypass fades the graph in 150 ms, the spectrum attacks in 10 ms and releases over 400 ms, and that is the whole motion vocabulary.
+Density is high and steady. The popover is four cards and a footer in a 360 point wide window at least 410 points tall, growing only with the system text size; the editor is a graph, a strip of small band cards, and two thin bars of controls. Text uses the system text styles from caption2 to body, values are monospaced, and nothing bounces. Controls are precise and restrained: a switch slides in 120 ms, bypass fades the graph in 150 ms, the spectrum attacks in 10 ms and releases over 400 ms, and that is the whole motion vocabulary.
 
 **Key Characteristics:**
 - System accent and system label colours only; the app never defines a hue of its own outside the band palette.
@@ -166,7 +166,7 @@ The palette is macOS itself; the tokens above are dark-appearance snapshots of d
 
 ## Layout
 
-The popover is a vertical stack of cards at 10 pt spacing inside 14 pt padding, fixed at 360 by 410 pt so the host window never resizes. Each card is 12 pt padded and full width. The editor is a single column: toolbar, graph filling the remaining height, a horizontally scrolling strip of 150 pt band cards at 8 pt spacing, then a bottom bar. Settings replaces the editor body with a grouped `Form` and a native tab bar. Sheets are fixed: onboarding 520 by 440 pt, import 560 by 470 pt.
+The popover is a vertical stack of cards at 10 pt spacing inside 14 pt padding, 360 pt wide and at least 410 pt tall, sized once when shown so the host window never resizes while open. Each card is 12 pt padded and full width. The editor is a single column: toolbar, graph filling the remaining height, a horizontally scrolling strip of 150 pt band cards at 8 pt spacing, then a bottom bar. Settings replaces the editor body with a grouped `Form` and a native tab bar. Sheets are fixed: onboarding 520 by 440 pt, import 560 by 470 pt.
 
 The observed spacing values are 2, 4, 8, 10, 12, and 14 pt, with 8 and 10 dominating. Treat 4 as the unit for control internals and 8 or 10 for gaps between siblings. Labels on the graph sit 4 pt inside the plot edge; axis text is right-aligned to the plot.
 
