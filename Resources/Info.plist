@@ -9,9 +9,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.onlyeq.app</string>
 	<key>CFBundleVersion</key>
-	<string>47</string>
+	<string>48</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.4.0</string>
+	<string>1.4.1</string>
 	<key>CFBundleExecutable</key>
 	<string>OnlyEQ</string>
 	<key>CFBundlePackageType</key>
