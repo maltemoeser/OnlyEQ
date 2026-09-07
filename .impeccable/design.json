@@ -1,49 +1,71 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-05T23:05:00Z",
+  "generatedAt": "2026-09-07T00:00:00Z",
   "title": "Design System: OnlyEQ",
   "extensions": {
     "colorMeta": {
       "accent": { "role": "primary", "displayName": "System Accent", "canonical": "Color.accentColor / NSColor.controlAccentColor (dynamic)", "tonalRamp": ["#04213f", "#063a6e", "#08529c", "#0969c8", "#0a84ff", "#4aa3ff", "#8ac1ff", "#c9e2ff"] },
       "label": { "role": "neutral", "displayName": "Label", "canonical": ".primary (dynamic)", "tonalRamp": ["#262626", "#404040", "#5c5c5c", "#7a7a7a", "#999999", "#b8b8b8", "#d6d6d6", "#f2f2f2"] },
       "label-secondary": { "role": "neutral", "displayName": "Secondary Label", "canonical": ".secondary (dynamic)", "tonalRamp": ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.25)", "rgba(255,255,255,0.35)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0.55)", "rgba(255,255,255,0.65)", "rgba(255,255,255,0.8)", "rgba(255,255,255,0.95)"] },
-      "card-fill": { "role": "neutral", "displayName": "Card Tint", "canonical": "Color.primary.opacity(0.055)", "tonalRamp": ["rgba(255,255,255,0.03)", "rgba(255,255,255,0.055)", "rgba(255,255,255,0.07)", "rgba(255,255,255,0.10)", "rgba(255,255,255,0.12)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.25)", "rgba(255,255,255,0.35)"] },
+      "label-tertiary": { "role": "neutral", "displayName": "Tertiary Label", "canonical": ".tertiary (dynamic); decoration only", "tonalRamp": ["rgba(255,255,255,0.08)", "rgba(255,255,255,0.12)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.25)", "rgba(255,255,255,0.35)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0.6)", "rgba(255,255,255,0.8)"] },
+      "well-fill": { "role": "neutral", "displayName": "Well Fill", "canonical": "Color.primary.opacity(0.035)", "tonalRamp": ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.035)", "rgba(255,255,255,0.05)", "rgba(255,255,255,0.07)", "rgba(255,255,255,0.10)", "rgba(255,255,255,0.14)", "rgba(255,255,255,0.20)", "rgba(255,255,255,0.30)"] },
+      "well-hairline": { "role": "neutral", "displayName": "Well Hairline", "canonical": "Color.primary.opacity(0.08)", "tonalRamp": ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0.10)", "rgba(255,255,255,0.14)", "rgba(255,255,255,0.20)", "rgba(255,255,255,0.28)", "rgba(255,255,255,0.40)"] },
       "boost-warning": { "role": "tertiary", "displayName": "Boost Warning", "canonical": ".orange (dynamic)", "tonalRamp": ["#3d2503", "#6b4105", "#9a5d07", "#c87909", "#ff9f0a", "#ffb43e", "#ffca72", "#ffe0a8"] },
-      "band-1": { "role": "tertiary", "displayName": "Band Blue", "canonical": ".blue", "tonalRamp": ["#04213f", "#063a6e", "#08529c", "#0969c8", "#0a84ff", "#4aa3ff", "#8ac1ff", "#c9e2ff"] }
+      "status-active": { "role": "tertiary", "displayName": "Status Active", "canonical": ".green (dynamic)", "tonalRamp": ["#0a3316", "#125a26", "#1a8236", "#22a946", "#30d158", "#5ddb7b", "#8be59e", "#b9efc2"] },
+      "status-error": { "role": "tertiary", "displayName": "Status Error", "canonical": ".red (dynamic)", "tonalRamp": ["#3d0f0d", "#6b1b17", "#9a2621", "#c8322b", "#ff453a", "#ff6e66", "#ff9792", "#ffc0bd"] },
+      "band-1": { "role": "tertiary", "displayName": "Band Blue", "canonical": ".blue; BandPalette.color(0)", "tonalRamp": ["#04213f", "#063a6e", "#08529c", "#0969c8", "#0a84ff", "#4aa3ff", "#8ac1ff", "#c9e2ff"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Onboarding welcome title only." },
-      "title": { "displayName": "Title", "purpose": "App name in the popover header, window titles." },
-      "body": { "displayName": "Body", "purpose": "Button labels, preset names, menu items." },
-      "label": { "displayName": "Label", "purpose": "Captions, form labels, status text." },
-      "caption": { "displayName": "Caption", "purpose": "Axis labels, meter text, chips, band-card field names." },
-      "value": { "displayName": "Value", "purpose": "Any number that updates live: Fc, Gain, Q, dB, latency." }
+      "title": { "displayName": "Title", "purpose": "\"Welcome to OnlyEQ\" only, beside a 30 pt app badge." },
+      "title2": { "displayName": "Title 2", "purpose": "Onboarding step headings." },
+      "title3": { "displayName": "Title 3", "purpose": "The drop well heading in the import sheet." },
+      "headline": { "displayName": "Headline", "purpose": "The Save Preset sheet title." },
+      "body": { "displayName": "Body", "purpose": "App name in the popover header (semibold); device and preset menu labels (medium)." },
+      "callout": { "displayName": "Callout", "purpose": "Notice headings, onboarding paragraphs, list rows." },
+      "subheadline": { "displayName": "Subheadline", "purpose": "Editor bottom-bar labels, import sheet body text, settings menu labels." },
+      "caption": { "displayName": "Caption", "purpose": "Captions, band-card values, the Compare row, import preview rows." },
+      "caption2": { "displayName": "Caption 2", "purpose": "Axis labels, status pill, ±dB corner labels, spectrum legend, band-card field names, slider tick labels." },
+      "value": { "displayName": "Value", "purpose": "Any number that updates live: Fc, Gain, Q, dB, percent, latency. Caption or subheadline with monospaced digits." },
+      "mono": { "displayName": "Mono", "purpose": "Pasted EQ text and shortcut key caps only." }
     },
     "shadows": [
       { "name": "knob", "value": "0 0.5px 1px rgba(0,0,0,0.25)", "purpose": "Switch knob only; matches NSSwitch." },
       { "name": "slider-knob", "value": "0 0.5px 1.5px rgba(0,0,0,0.35)", "purpose": "Boost slider knob only." }
     ],
     "motion": [
-      { "name": "switch", "value": "120ms ease-out", "purpose": "Switch knob slide." },
-      { "name": "bypass-fade", "value": "150ms ease-in-out", "purpose": "Graph and curve fade when bypass toggles." },
-      { "name": "spectrum-detector", "value": "attack 10ms / release 400ms on power", "purpose": "Spectrum bar ballistics; the view adds a 45ms interpolation between 30 Hz frames." }
+      { "name": "switch", "value": "120ms ease-out", "purpose": "Switch knob slide. Skipped under Reduce Motion." },
+      { "name": "bypass-fade", "value": "150ms ease-in-out", "purpose": "Plot and control column fade when bypass or the EQ switch toggles. Skipped under Reduce Motion." },
+      { "name": "band-strip-scroll", "value": "200ms ease-out", "purpose": "Scrolls the selected band's card into view when a handle is picked on the graph. Skipped under Reduce Motion." },
+      { "name": "spectrum-detector", "value": "attack 10ms / release 400ms on power", "purpose": "Spectrum bar ballistics; the layer adds a 45ms interpolation between 30 Hz analysis frames at the display rate." }
     ],
-    "breakpoints": []
+    "materials": [
+      { "name": "panel", "value": "NSGlassEffectView(.regular) on macOS 26; NSVisualEffectView(.popover, behindWindow) before", "purpose": "The popover's ground: the system menu-bar material with a 14pt continuous corner." }
+    ],
+    "windows": [
+      { "name": "popover", "value": "360 × ≥420pt, borderless NSPanel, level popUpMenu, system shadow, sized once when shown", "purpose": "One stack at 14pt padding and spacing: header, 150pt plot well, device row, preset row, footer." },
+      { "name": "editor", "value": "840 × 560pt default, 720 × 480 minimum, unified 52pt toolbar, title hidden", "purpose": "Toolbar items, Compare row, graph, 122pt band strip, Preamp bar; 24pt side margins." },
+      { "name": "settings", "value": "560pt wide, NSTabViewController toolbar tabs, height follows the page", "purpose": "One grouped Form per page." },
+      { "name": "onboarding", "value": "560 × ≥460pt, transparent title bar, title hidden", "purpose": "Setup assistant: content, divider, Back/Continue footer at .large." },
+      { "name": "import-sheet", "value": "560 × ≥470pt", "purpose": "Segmented picker, divider, tab body, divider, Cancel/Apply footer." }
+    ],
+    "breakpoints": [
+      { "name": "compact-axis", "value": "300pt plot width", "purpose": "Below this, the frequency axis labels every second octave (20 Hz, 125, 500, 2 kHz, 8 kHz)." }
+    ]
   },
   "components": [
     {
-      "name": "Card",
+      "name": "Plot Well",
       "kind": "card",
-      "refersTo": "card",
-      "description": "Popover section surface: 5.5% primary tint with a 7% hairline, continuous 12pt corners.",
-      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Preset</div><div class=\"ds-card-row\">HD 650 · oratory1990</div></div>",
-      "css": ".ds-card { background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px; color: #fff; font: 12px -apple-system, system-ui, sans-serif; width: 320px; } .ds-card-title { font-size: 11px; color: rgba(255,255,255,0.55); margin-bottom: 6px; } .ds-card-row { font-weight: 500; }"
+      "refersTo": "plot-well",
+      "description": "The one drawn surface (plotWell modifier): 3.5% primary tint, 8% hairline, 10pt continuous corners, with a curve inside and axis labels beneath. 150pt tall in the popover.",
+      "html": "<div class=\"ds-well-wrap\"><div class=\"ds-well\"><svg viewBox=\"0 0 288 180\" width=\"332\" height=\"150\" preserveAspectRatio=\"none\"><defs><linearGradient id=\"ds-fill\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#0a84ff\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"#0a84ff\" stop-opacity=\"0.03\"/></linearGradient></defs><g stroke=\"rgba(255,255,255,0.12)\" stroke-dasharray=\"2 3\"><line x1=\"18\" y1=\"0\" x2=\"18\" y2=\"180\"/><line x1=\"47\" y1=\"0\" x2=\"47\" y2=\"180\"/><line x1=\"76\" y1=\"0\" x2=\"76\" y2=\"180\"/><line x1=\"105\" y1=\"0\" x2=\"105\" y2=\"180\"/><line x1=\"134\" y1=\"0\" x2=\"134\" y2=\"180\"/><line x1=\"163\" y1=\"0\" x2=\"163\" y2=\"180\"/><line x1=\"192\" y1=\"0\" x2=\"192\" y2=\"180\"/><line x1=\"221\" y1=\"0\" x2=\"221\" y2=\"180\"/><line x1=\"250\" y1=\"0\" x2=\"250\" y2=\"180\"/><line x1=\"279\" y1=\"0\" x2=\"279\" y2=\"180\"/></g><line x1=\"0\" y1=\"90\" x2=\"288\" y2=\"90\" stroke=\"rgba(255,255,255,0.25)\"/><path d=\"M0 50 C40 55 60 105 90 100 S140 85 170 92 S220 40 250 70 S275 95 288 90 V180 H0 Z\" fill=\"url(#ds-fill)\"/><path d=\"M0 50 C40 55 60 105 90 100 S140 85 170 92 S220 40 250 70 S275 95 288 90\" fill=\"none\" stroke=\"#0a84ff\" stroke-width=\"2\" stroke-linejoin=\"round\"/></svg><span class=\"ds-status\"><span class=\"ds-status-dot\"></span>Active · 11 ms</span></div><div class=\"ds-axis\"><span>20 Hz</span><span>125</span><span>500</span><span>2 kHz</span><span>8 kHz</span></div></div>",
+      "css": ".ds-well-wrap { width: 332px; font: 10px -apple-system, system-ui, sans-serif; color: rgba(255,255,255,0.55); } .ds-well { position: relative; height: 150px; border-radius: 10px; background: rgba(255,255,255,0.035); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); overflow: hidden; } .ds-well svg { display: block; } .ds-status { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 999px; background: rgba(30,30,30,0.6); font-weight: 500; font-variant-numeric: tabular-nums; } .ds-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #30d158; } .ds-axis { display: flex; justify-content: space-between; padding: 4px 1px 0; }"
     },
     {
       "name": "Switch",
       "kind": "custom",
       "refersTo": "switch",
-      "description": "AccentSwitchStyle: 34x20 capsule, accent when on, 18% primary when off, white knob with a faint shadow.",
+      "description": "AccentSwitchStyle: 34x20 capsule, accent when on, 18% primary when off, white knob with a faint shadow, 120ms ease-out.",
       "html": "<label class=\"ds-switch\"><input type=\"checkbox\" checked><span class=\"ds-switch-track\"><span class=\"ds-switch-knob\"></span></span></label>",
       "css": ".ds-switch { display: inline-block; cursor: pointer; } .ds-switch input { position: absolute; opacity: 0; width: 0; height: 0; } .ds-switch-track { display: block; width: 34px; height: 20px; border-radius: 999px; background: rgba(255,255,255,0.18); position: relative; transition: background 120ms ease-out; } .ds-switch-knob { position: absolute; top: 1.5px; left: 1.5px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 0.5px 1px rgba(0,0,0,0.25); transition: left 120ms ease-out; } .ds-switch input:checked + .ds-switch-track { background: #0a84ff; } .ds-switch input:checked + .ds-switch-track .ds-switch-knob { left: 15.5px; } .ds-switch input:focus-visible + .ds-switch-track { outline: 2px solid rgba(10,132,255,0.6); outline-offset: 2px; }"
     },
@@ -51,72 +73,84 @@
       "name": "Small Bordered Button",
       "kind": "button",
       "refersTo": "button",
-      "description": "Native .bordered button at .small size; the only button style in the app.",
+      "description": "Native .bordered button at .small size, as the popover footer uses it; the app has no custom button.",
       "html": "<button class=\"ds-btn\">Import…</button>",
       "css": ".ds-btn { font: 12px -apple-system, system-ui, sans-serif; color: #fff; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 3px 10px; cursor: pointer; transition: background 120ms ease-out; } .ds-btn:hover { background: rgba(255,255,255,0.14); } .ds-btn:active { background: rgba(255,255,255,0.20); } .ds-btn:focus-visible { outline: 2px solid rgba(10,132,255,0.6); outline-offset: 1px; }"
+    },
+    {
+      "name": "Identity Row",
+      "kind": "nav",
+      "refersTo": "identity-symbol",
+      "description": "Popover row, full width: a 28pt circled secondary symbol, a borderless menu holding the name, and a detail indented 38pt beneath.",
+      "html": "<div class=\"ds-row\"><div class=\"ds-row-head\"><span class=\"ds-row-symbol\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\"><path d=\"M2 9V7a5 5 0 0 1 10 0v2\"/><rect x=\"1.5\" y=\"8\" width=\"3\" height=\"4\" rx=\"1\"/><rect x=\"9.5\" y=\"8\" width=\"3\" height=\"4\" rx=\"1\"/></svg></span><button class=\"ds-row-menu\">External Headphones <span class=\"ds-row-chev\">⌄</span></button></div><div class=\"ds-row-detail\">Auto on External Headphones</div></div>",
+      "css": ".ds-row { width: 332px; font: 13px -apple-system, system-ui, sans-serif; color: #fff; } .ds-row-head { display: flex; align-items: center; gap: 10px; } .ds-row-symbol { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); } .ds-row-menu { font: 500 13px -apple-system, system-ui, sans-serif; color: #fff; background: none; border: none; padding: 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; } .ds-row-menu:focus-visible { outline: 2px solid rgba(10,132,255,0.6); outline-offset: 2px; border-radius: 4px; } .ds-row-chev { color: rgba(255,255,255,0.55); font-size: 11px; } .ds-row-detail { margin: 6px 0 0 38px; font-size: 10px; color: rgba(255,255,255,0.55); }"
     },
     {
       "name": "Value Field",
       "kind": "input",
       "refersTo": "value-field",
-      "description": "Click-to-edit monospaced value with a quaternary fill and 4pt corners.",
+      "description": "Click-to-edit caption value with monospaced digits, quaternary 50% fill, and 4pt corners.",
       "html": "<span class=\"ds-value\">1.5 kHz</span>",
-      "css": ".ds-value { display: inline-block; font: 11px 'SF Mono', ui-monospace, Menlo, monospace; color: #fff; background: rgba(255,255,255,0.10); border-radius: 4px; padding: 2px 4px; font-variant-numeric: tabular-nums; } .ds-value:hover { background: rgba(255,255,255,0.14); } .ds-value:focus-visible { outline: 2px solid rgba(10,132,255,0.6); }"
+      "css": ".ds-value { display: inline-block; min-width: 72px; text-align: right; font: 10px -apple-system, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #fff; background: rgba(255,255,255,0.10); border-radius: 4px; padding: 2px 4px; cursor: text; } .ds-value:hover { background: rgba(255,255,255,0.14); } .ds-value:focus-visible { outline: 2px solid rgba(10,132,255,0.6); }"
     },
     {
-      "name": "Chip",
+      "name": "Key Cap",
       "kind": "chip",
-      "refersTo": "chip",
-      "description": "Capsule with quaternary fill and 10pt secondary text, used for format names and band count.",
-      "html": "<span class=\"ds-chip\">AutoEq</span>",
-      "css": ".ds-chip { display: inline-block; font: 10px -apple-system, system-ui, sans-serif; color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.10); border-radius: 999px; padding: 3px 8px; }"
+      "refersTo": "key-cap",
+      "description": "Shortcut chord in Settings: quaternary 60% fill, 5pt corners, subheadline SF Mono.",
+      "html": "<span class=\"ds-keycap\">⌃⌥⌘E</span>",
+      "css": ".ds-keycap { display: inline-block; font: 11px 'SF Mono', ui-monospace, Menlo, monospace; color: #fff; background: rgba(255,255,255,0.10); border-radius: 5px; padding: 3px 8px; }"
     },
     {
       "name": "Band Card",
       "kind": "card",
       "refersTo": "band-card",
-      "description": "150pt editor card for one band; separator hairline, band-coloured 1.5pt border when selected.",
-      "html": "<div class=\"ds-band ds-band-selected\"><div class=\"ds-band-head\"><span class=\"ds-band-dot\"></span><span>1 · Peak</span></div><div class=\"ds-band-row\"><span>Fc</span><span class=\"ds-band-val\">105 Hz</span></div><div class=\"ds-band-row\"><span>Gain</span><span class=\"ds-band-val\">-3.5 dB</span></div><div class=\"ds-band-row\"><span>Q</span><span class=\"ds-band-val\">0.70</span></div></div>",
-      "css": ".ds-band { width: 150px; box-sizing: border-box; padding: 8px; background: #1e1e1e; border: 1px solid rgba(255,255,255,0.10); border-radius: 8px; color: #fff; font: 10px -apple-system, system-ui, sans-serif; } .ds-band-selected { border: 1.5px solid #0a84ff; } .ds-band-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; margin-bottom: 6px; } .ds-band-dot { width: 8px; height: 8px; border-radius: 50%; background: #0a84ff; } .ds-band-row { display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.55); margin: 3px 0; } .ds-band-val { font: 11px 'SF Mono', ui-monospace, Menlo, monospace; color: #fff; background: rgba(255,255,255,0.10); border-radius: 4px; padding: 1px 4px; }"
+      "description": "150pt editor card for one band: control-background fill, separator hairline, band-coloured 1.5pt border when selected, tertiary delete glyph.",
+      "html": "<div class=\"ds-band ds-band-selected\"><div class=\"ds-band-head\"><span class=\"ds-band-dot\"></span><span class=\"ds-band-num\">1</span><span>Low Shelf <span class=\"ds-band-chev\">⌄</span></span><span class=\"ds-band-x\">✕</span></div><div class=\"ds-band-row\"><span>Fc</span><span class=\"ds-band-val\">105 Hz</span></div><div class=\"ds-band-row\"><span>Gain</span><span class=\"ds-band-val\">6.4 dB</span></div><div class=\"ds-band-row\"><span>Q</span><span class=\"ds-band-val\">0.70</span></div></div>",
+      "css": ".ds-band { width: 150px; box-sizing: border-box; padding: 8px; background: #1e1e1e; border: 1px solid rgba(255,255,255,0.10); border-radius: 8px; color: #fff; font: 10px -apple-system, system-ui, sans-serif; } .ds-band-selected { border: 1.5px solid #0a84ff; } .ds-band-head { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; } .ds-band-dot { width: 8px; height: 8px; border-radius: 50%; background: #0a84ff; } .ds-band-num { font-weight: 600; color: rgba(255,255,255,0.55); } .ds-band-chev { color: rgba(255,255,255,0.55); } .ds-band-x { margin-left: auto; width: 18px; text-align: center; font-weight: 700; color: rgba(255,255,255,0.25); cursor: pointer; } .ds-band-x:hover { color: rgba(255,255,255,0.55); } .ds-band-row { display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.55); margin: 4px 0 0; } .ds-band-row > span:first-child { min-width: 28px; } .ds-band-val { flex: 1; text-align: right; font-variant-numeric: tabular-nums; color: #fff; background: rgba(255,255,255,0.10); border-radius: 4px; padding: 2px 4px; }"
     },
     {
       "name": "App Badge",
       "kind": "custom",
       "refersTo": "app-badge",
-      "description": "24pt accent square with a white bar-chart symbol; the only logo mark.",
-      "html": "<span class=\"ds-badge\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"#fff\"><rect x=\"1\" y=\"8\" width=\"3\" height=\"5\" rx=\"0.8\"/><rect x=\"5.5\" y=\"4\" width=\"3\" height=\"9\" rx=\"0.8\"/><rect x=\"10\" y=\"1\" width=\"3\" height=\"12\" rx=\"0.8\"/></svg></span>",
-      "css": ".ds-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #0a84ff; }"
+      "description": "22pt accent square with a continuous corner at 27% of its size and a bold white bar-chart symbol; the only logo mark.",
+      "html": "<span class=\"ds-badge\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"#fff\"><rect x=\"0.5\" y=\"6.5\" width=\"3\" height=\"5\" rx=\"0.8\"/><rect x=\"4.5\" y=\"3\" width=\"3\" height=\"8.5\" rx=\"0.8\"/><rect x=\"8.5\" y=\"0.5\" width=\"3\" height=\"11\" rx=\"0.8\"/></svg></span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: #0a84ff; }"
     }
   ],
   "narrative": {
     "northStar": "The Menu Bar Native",
-    "overview": "OnlyEQ should look like a utility Apple forgot to ship. Every colour is a system semantic colour that follows the user's accent and appearance; every typeface is San Francisco; every control is either a native SwiftUI control or a pixel-faithful stand-in for one. The app has no palette, no logo mark beyond an SF Symbol in an accent square, and no decoration. Brand lives in one place only: the frequency-response curve with the live spectrum breathing behind it, and the ten-colour band palette that ties graph handles to their cards.\n\nDensity is high and steady. The popover is four cards and a footer in a 360 point wide window at least 410 points tall, growing only with the system text size; the editor is a graph, a strip of small band cards, and two thin bars of controls. Text uses the system text styles from caption2 to body, values are monospaced, and nothing bounces. Controls are precise and restrained: a switch slides in 120 ms, bypass fades the graph in 150 ms, the spectrum attacks in 10 ms and releases over 400 ms, and that is the whole motion vocabulary.",
+    "overview": "OnlyEQ should look like a utility Apple forgot to ship. Every colour is a system semantic colour that follows the user's accent and appearance; every typeface is San Francisco through the system text styles; every control is either a native SwiftUI control or a pixel-faithful stand-in for one. The app has no palette, no logo mark beyond an SF Symbol in an accent square, and no decoration. Brand lives in one place only: the frequency-response curve with the live spectrum breathing behind it, and the band palette that ties graph handles to their cards.\n\nThe popover is one instrument, not a stack of cards. Under the name and its switch, the live response spans the full width inside a hairline well, and the controls follow beneath it, reading top to bottom as the signal path: output device with volume, preset with its device binding and Bypass and Crossfeed, then Import, Equalizer, and the gear. Rows are separated by space, not by boxes. The whole thing sits on the system's own menu-bar material in a 360 point wide panel at least 420 points tall that grows only with the system text size. The editor, Settings, onboarding, and the import sheet are ordinary macOS windows: a unified toolbar, toolbar-style settings tabs, a setup assistant with a Back and Continue footer, a sheet with a segmented picker.\n\nMotion is short, eased, and tied to a state change. A switch slides in 120 ms, bypass fades the plot in 150 ms, the band strip scrolls a selected card into view in 200 ms, and the spectrum attacks in 10 ms and releases over 400 ms. Every one of them is skipped under Reduce Motion, and that is the whole vocabulary.",
     "keyCharacteristics": [
       "System accent and system label colours only; the app never defines a hue of its own outside the band palette.",
-      "Tonal layering, no shadows: cards are a 5.5 % tint with a 7 % hairline.",
+      "One drawn surface: the plot well, a 3.5 % tint with an 8 % hairline at a 10 pt continuous corner. Everything else is a native window, material, or form.",
       "One custom control family (switch, boost slider, curve editor), each drawn to match AppKit.",
-      "Monospaced digits wherever a number can change.",
-      "Motion is short, eased, and tied to a state change, never decorative."
+      "Text uses the system text styles, so every window's height follows the system text size.",
+      "Secondary label for anything a person reads; tertiary only for decoration."
     ],
     "rules": [
-      { "name": "The One Hue Rule", "body": "Outside the band palette and the boost warning, the only chromatic colour on screen is the user's accent. Never introduce a second brand colour.", "section": "colors" },
+      { "name": "The One Hue Rule", "body": "Outside the band palette and the status colours, the only chromatic colour on screen is the user's accent. Never introduce a second brand colour.", "section": "colors" },
       { "name": "The Tint, Not Paint Rule", "body": "Surfaces are Color.primary at low opacity so they read correctly in both appearances and with any accent. Never fill a surface with a literal grey.", "section": "colors" },
+      { "name": "The Read It In Secondary Rule", "body": "Text a person reads is primary or secondary label. Tertiary is reserved for decoration that carries no information on its own: the add-band dashed border and the delete glyph.", "section": "colors" },
       { "name": "The Monospaced Number Rule", "body": "Any number that can change while visible is set in monospaced digits so the layout does not shift.", "section": "typography" },
-      { "name": "The Two-Step Rule", "body": "Adjacent hierarchy levels differ by one point size or one weight step, never both, and never more.", "section": "typography" },
-      { "name": "The System Casts The Shadow Rule", "body": "Only windows, popovers, sheets, and control knobs have shadows, and only the ones AppKit would draw. Do not add shadows to cards, nodes, or hover states.", "section": "elevation" }
+      { "name": "The Text Style Rule", "body": "Text takes a system text style, never a point size. The three exceptions are SF Symbols used as illustrations (40, 34, and half the badge size).", "section": "typography" },
+      { "name": "The System Casts The Shadow Rule", "body": "Only windows, popovers, sheets, and control knobs have shadows, and only the ones AppKit would draw. Do not add shadows to cards, nodes, or hover states.", "section": "elevation" },
+      { "name": "The One Surface Rule", "body": "No cards: rows are separated by space; the plot alone sits in a hairline well, the one surface the app draws. Every plot outside the editor's canvas sits in the same one. The well is the plotWell() modifier: Color.primary at 3.5 % with a 1 pt 8 % hairline and 10 pt continuous corners. The popover plot, the onboarding sample curve, both preview curves in the import sheet, and the import drop well share it. The editor graph is the only exception; it fills its window edge to edge.", "section": "elevation" }
     ],
     "dos": [
       "Do use Color.accentColor, .primary, .secondary, .tertiary, .quaternary, and NSColor semantic colours; that is how the app follows the user's accent and appearance.",
-      "Do set every live number in monospaced digits.",
-      "Do keep new controls native: .bordered buttons at .small, native menus, grouped forms in Settings.",
-      "Do tie any animation to a state change and keep it under 200 ms with an ease curve.",
-      "Do give every icon-only control an accessibility label and prefer text styles that scale with the system text size."
+      "Do put every plot outside the editor's canvas in the plot well, and nothing else in a well of its own.",
+      "Do set every live number in monospaced digits and every run of text in a system text style.",
+      "Do keep new controls native: bordered buttons, native menus, real toolbar items, grouped forms in Settings, a setup-assistant footer in onboarding.",
+      "Do tie any animation to a state change, keep it under 200 ms with an ease curve, and skip it under Reduce Motion.",
+      "Do give every icon-only control an accessibility label and every custom control a VoiceOver representation."
     ],
     "donts": [
       "Don't introduce a hex colour, a custom font, or a gradient outside the curve fill.",
-      "Don't add shadows to cards, nodes, hover states, or anything AppKit would draw flat.",
+      "Don't add cards, boxes, or shadows to group rows; separate them with space.",
+      "Don't use tertiary label for anything a person has to read.",
       "Don't invent a second toggle look; a control that is on or off is a switch, a button toggle, or a checkbox, matching its neighbours on the same surface.",
-      "Don't let the popover change size; it is fixed so the spectrum can redraw without relayout.",
+      "Don't let the popover change size while open; it is sized once when shown so the spectrum can redraw without relayout.",
       "Don't use the band palette for anything but bands."
     ]
   }

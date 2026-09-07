@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Sparkle
 import SwiftUI
 import CoreAudio
@@ -10,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var localMouseMonitor: Any?
     private var workspaceActivationObserver: NSObjectProtocol?
     private var hidePanelObserver: NSObjectProtocol?
+    private var statusIconSubscription: AnyCancellable?
     private let appShortcutMonitor = AppShortcutMonitor()
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -28,11 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let hosting = NSHostingController(
             rootView: PopoverView()
                 .environmentObject(state)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(PanelMaterial(cornerRadius: PopoverView.cornerRadius))
         )
         hosting.sizingOptions = .standardBounds
         menuPanel = MenuPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 410),
+            contentRect: NSRect(x: 0, y: 0, width: PopoverView.width, height: PopoverView.minHeight),
             styleMask: [.borderless], backing: .buffered, defer: false
         )
         menuPanel.contentViewController = hosting
@@ -45,25 +47,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menuPanel.backgroundColor = .clear
         menuPanel.collectionBehavior = [.transient, .moveToActiveSpace, .fullScreenAuxiliary]
         hosting.view.wantsLayer = true
-        hosting.view.layer?.cornerRadius = 12
+        hosting.view.layer?.cornerRadius = PopoverView.cornerRadius
         hosting.view.layer?.cornerCurve = .continuous
         hosting.view.layer?.masksToBounds = true
         Log.write("app: menu panel ready")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let icon = NSImage(
-                systemSymbolName: OnlyEQIcon.symbolName,
-                accessibilityDescription: "OnlyEQ"
-            )
-            // Template rendering keeps the mark consistent in light/dark menu
-            // bars and white-ish while the custom panel is highlighted open.
-            icon?.isTemplate = true
-            button.image = icon
             button.action = #selector(statusItemClicked(_:))
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        // The mark itself says whether the EQ is shaping sound: filled while
+        // active, outlined while off or bypassed.
+        statusIconSubscription = state.$isEnabled.combineLatest(state.$bypassed)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled, bypassed in
+                self?.updateStatusIcon(active: enabled && !bypassed)
+            }
         Log.write("app: status item ready (visible: \(statusItem.isVisible))")
         installPanelDismissalObservers()
 
@@ -75,6 +76,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if CommandLine.arguments.contains("--accessory-import-probe") {
             DispatchQueue.main.async { WindowManager.shared.showEditor(importing: true) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { NSApp.terminate(nil) }
+        }
+
+        // `--window-layout-probe`: open the editor and report the real title
+        // bar geometry (the offscreen renderer fakes it), then quit.
+        if CommandLine.arguments.contains("--window-layout-probe") {
+            WindowManager.shared.showEditor()
+            WindowManager.shared.showSettings()
+            for window in NSApp.windows where !window.title.isEmpty {
+                window.contentView?.layoutSubtreeIfNeeded()
+                let titleBar = window.frame.height - window.contentLayoutRect.height
+                let close = window.standardWindowButton(.closeButton)?.frame ?? .zero
+                let items = window.toolbar?.items.map(\.itemIdentifier.rawValue) ?? []
+                print("layout: \(window.title) titleBar=\(titleBar) close=\(close) frame=\(window.frame.size) toolbar=\(items)")
+            }
+            exit(0)
         }
 
         HotKeyManager.shared.install()
@@ -97,6 +113,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     // MARK: - Status item
+
+    private func updateStatusIcon(active: Bool) {
+        guard let button = statusItem.button else { return }
+        let icon = NSImage(
+            systemSymbolName: active ? OnlyEQIcon.symbolName : OnlyEQIcon.inactiveSymbolName,
+            accessibilityDescription: active ? "OnlyEQ, active" : "OnlyEQ, off"
+        )
+        // Template rendering keeps the mark consistent in light/dark menu
+        // bars and white-ish while the custom panel is highlighted open.
+        icon?.isTemplate = true
+        button.image = icon
+    }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
         if NSApp.currentEvent?.type == .rightMouseUp {
@@ -224,7 +252,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func checkForUpdates() { updaterController.checkForUpdates(nil) }
 }
 
-private extension Notification.Name {
+extension Notification.Name {
+    /// Posted by anything that wants the menu panel gone: opening a window,
+    /// or Escape inside the popover.
     static let onlyEQHideMenuPanel = Notification.Name("OnlyEQ.HideMenuPanel")
 }
 
@@ -241,6 +271,7 @@ final class WindowManager {
     static let shared = WindowManager()
 
     private var editorWindow: NSWindow?
+    private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
 
     func showEditor(importing: Bool = false, profileSuggestion: ProfileSuggestion? = nil) {
@@ -254,6 +285,10 @@ final class WindowManager {
             window.title = "Equalizer"
             window.minSize = NSSize(width: 720, height: 480)
             window.isReleasedWhenClosed = false
+            // EditorView supplies the toolbar items; the preset menu stands
+            // where a document title would, so the title itself stays hidden.
+            window.toolbarStyle = .unified
+            window.titleVisibility = .hidden
             let hosting = NSHostingController(
                 rootView: EditorView(initialImportRequested: importing,
                                      initialProfileSuggestion: profileSuggestion)
@@ -284,8 +319,36 @@ final class WindowManager {
     }
 
     func showSettings() {
-        AppState.shared.editorShowsSettings = true
-        showEditor()
+        if settingsWindow == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: SettingsPage.width, height: 420),
+                styleMask: [.titled, .closable, .miniaturizable],
+                backing: .buffered, defer: false
+            )
+            window.title = "Settings"
+            window.isReleasedWhenClosed = false
+            // Toolbar-style tabs, as System Settings and every Mac app's
+            // settings window draw them; the window resizes to each page.
+            let tabs = NSTabViewController()
+            tabs.tabStyle = .toolbar
+            for page in SettingsPage.allCases {
+                let hosting = NSHostingController(
+                    rootView: page.view
+                        .environmentObject(AppState.shared)
+                        .frame(width: SettingsPage.width)
+                )
+                hosting.sizingOptions = .preferredContentSize
+                let item = NSTabViewItem(viewController: hosting)
+                item.label = page.title
+                item.image = NSImage(systemSymbolName: page.symbol, accessibilityDescription: page.title)
+                tabs.addTabViewItem(item)
+            }
+            window.contentViewController = tabs
+            if !window.setFrameUsingName("SettingsWindow") { window.center() }
+            window.setFrameAutosaveName("SettingsWindow")
+            settingsWindow = window
+        }
+        if let settingsWindow { focus(settingsWindow) }
     }
 
     /// Deleting a stored preset has no undo, so it asks first. Called from the
@@ -306,15 +369,21 @@ final class WindowManager {
     func showOnboarding() {
         if onboardingWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 520, height: 460),
-                styleMask: [.titled, .closable],
+                contentRect: NSRect(x: 0, y: 0, width: OnboardingView.width, height: OnboardingView.height),
+                styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered, defer: false
             )
-            window.title = "OnlyEQ"
+            window.title = "Welcome to OnlyEQ"
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
             window.isReleasedWhenClosed = false
-            window.contentViewController = NSHostingController(
+            let hosting = NSHostingController(
                 rootView: OnboardingView().environmentObject(AppState.shared)
+                    .ignoresSafeArea(.container, edges: .top)
             )
+            // Fixed width; the height follows the system text size.
+            hosting.sizingOptions = .preferredContentSize
+            window.contentViewController = hosting
             window.center()
             onboardingWindow = window
         }

@@ -1,21 +1,42 @@
 import SwiftUI
 import ServiceManagement
 
-struct SettingsView: View {
-    @EnvironmentObject var state: AppState
+/// The pages of the Settings window. The window itself is an
+/// NSTabViewController with toolbar-style tabs (see WindowManager), the
+/// macOS settings idiom; each page is one grouped Form.
+enum SettingsPage: CaseIterable {
+    case general, devices, sound, shortcuts, advanced
 
-    var body: some View {
-        TabView {
-            GeneralSettings()
-                .tabItem { Label("General", systemImage: "gearshape") }
-            DeviceSettings()
-                .tabItem { Label("Devices", systemImage: "headphones") }
-            SoundSettings()
-                .tabItem { Label("Sound", systemImage: "waveform") }
-            ShortcutSettings()
-                .tabItem { Label("Shortcuts", systemImage: "command") }
-            AdvancedSettings()
-                .tabItem { Label("Advanced", systemImage: "wrench.and.screwdriver") }
+    static let width: CGFloat = 560
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .devices: "Devices"
+        case .sound: "Sound"
+        case .shortcuts: "Shortcuts"
+        case .advanced: "Advanced"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .devices: "headphones"
+        case .sound: "waveform"
+        case .shortcuts: "command"
+        case .advanced: "wrench.and.screwdriver"
+        }
+    }
+
+    @ViewBuilder
+    var view: some View {
+        switch self {
+        case .general: GeneralSettings()
+        case .devices: DeviceSettings()
+        case .sound: SoundSettings()
+        case .shortcuts: ShortcutSettings()
+        case .advanced: AdvancedSettings()
         }
     }
 }

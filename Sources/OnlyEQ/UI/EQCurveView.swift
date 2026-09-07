@@ -460,7 +460,7 @@ private struct DraggableBandNode: View {
 
     private func handle(isSelected: Bool) -> some View {
         Circle()
-            .fill(BandPalette.color(band.colorIndex ?? 0))
+            .fill(BandPalette.color(band.colorIndex ?? (number - 1)))
             .frame(width: isSelected ? 14 : 11, height: isSelected ? 14 : 11)
             .overlay(Circle().stroke(.white.opacity(isSelected ? 0.9 : 0.5),
                                      lineWidth: isSelected ? 2 : 1))
@@ -514,8 +514,9 @@ private struct DraggableBandNode: View {
 struct FrequencyAxisLabels: View {
     var compact = false
 
+    /// Every second octave gridline, for plots under about 300 points wide.
     private static let compactItems: [(freq: Double, label: String)] = [
-        (20, "20 Hz"), (100, "100 Hz"), (1000, "1 kHz"), (10000, "10 kHz"),
+        (20, "20 Hz"), (125, "125"), (500, "500"), (2000, "2 kHz"), (8000, "8 kHz"),
     ]
     private static let fullItems: [(freq: Double, label: String)] = [
         (20, "20 Hz"), (62, "62"), (125, "125"), (250, "250"), (500, "500"),

@@ -15,7 +15,8 @@ if let flagIndex = CommandLine.arguments.firstIndex(of: "--screenshots") {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
         app.finishLaunching()
-        exit(ScreenshotRenderer.run(outputDir: outputDir))
+        exit(ScreenshotRenderer.run(outputDir: outputDir,
+                                    includeLight: CommandLine.arguments.contains("--light")))
     }
 }
 
@@ -78,7 +79,8 @@ if CommandLine.arguments.contains("--engine-probe") {
 
 MainActor.assumeIsolated {
     if CommandLine.arguments.contains("--menu-panel-probe")
-        || CommandLine.arguments.contains("--accessory-import-probe") {
+        || CommandLine.arguments.contains("--accessory-import-probe")
+        || CommandLine.arguments.contains("--window-layout-probe") {
         AppState.screenshotMode = true
     }
     let app = NSApplication.shared

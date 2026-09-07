@@ -56,7 +56,9 @@ struct ImportSheet: View {
             Divider()
             footer
         }
-        .frame(width: 560, height: 470)
+        // Fixed width; the height follows the system text size.
+        .frame(width: 560)
+        .frame(minHeight: 470)
         .task(id: source) {
             if tab == .browse {
                 await state.onlineDB.load(source: source)
@@ -70,42 +72,45 @@ struct ImportSheet: View {
 
     // MARK: - Drop tab
 
+    /// The whole tab accepts the drop; the well only says so.
     private var dropTab: some View {
         VStack(spacing: 14) {
             VStack(spacing: 10) {
-                Image(systemName: "square.and.arrow.down")
+                Image(systemName: isDropTargeted ? "arrow.down.doc.fill" : "doc.badge.plus")
                     .font(.system(size: 34))
-                    .foregroundStyle(.secondary)
-                Text("Drop any EQ preset")
+                    .foregroundStyle(isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                    .accessibilityHidden(true)
+                Text(isDropTargeted ? "Release to import" : "Drop a preset file here")
                     .font(.title3.weight(.semibold))
-                Text("Drop a file here to import")
+                Text("Reads AutoEq, Equalizer APO, peqdb, Wavelet, Poweramp, OPRA, Peace, REW, and eqMac files.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 380)
                 Button("Choose File…") { chooseFile() }
+                    .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, minHeight: 200)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isDropTargeted ? Color.accentColor.opacity(0.08) : .clear)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(style: StrokeStyle(lineWidth: isDropTargeted ? 2 : 1.5, dash: [6]))
-                            .foregroundStyle(isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
-                    )
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.035))
             )
-            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-                handleDrop(providers)
-            }
-
-            VStack(spacing: 6) {
-                Text("Supported formats").font(.caption).foregroundStyle(.tertiary)
-                FlowPills(items: ["AutoEq", "Equalizer APO", "peqdb", "Wavelet / GraphicEQ",
-                                  "Poweramp JSON", "OPRA JSON", "Peace", "REW", "eqMac"])
-            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.primary.opacity(0.08)),
+                                  lineWidth: 1)
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Drop zone. Drop a preset file here, or choose one.")
 
             stagedPreview
         }
         .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .contentShape(Rectangle())
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers)
+        }
     }
 
     private func chooseFile() {
@@ -151,7 +156,7 @@ struct ImportSheet: View {
                     if pastedText.isEmpty {
                         Text("Preamp: -6.1 dB\nFilter 1: ON PK Fc 105 Hz Gain 6.4 dB Q 0.70")
                             .font(.system(.subheadline, design: .monospaced))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .padding(.top, 1).padding(.leading, 5)
                             .allowsHitTesting(false)
                     }
@@ -200,17 +205,14 @@ struct ImportSheet: View {
                 .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.09)))
             }
 
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search \(source == .peqdb ? "peqdb" : "AutoEq") headphones…", text: $searchText)
-                    .textFieldStyle(.plain)
+            HStack(spacing: 8) {
+                SearchField(text: $searchText, prompt: "Search \(source == .peqdb ? "peqdb" : "AutoEq") headphones")
                 Picker("Source", selection: $source) {
                     ForEach(OnlineEntry.Source.allCases) { Text($0.rawValue).tag($0) }
                 }
+                .labelsHidden()
                 .fixedSize()
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
 
             if state.onlineDB.isLoading {
                 Spacer()
@@ -294,6 +296,7 @@ struct ImportSheet: View {
                 Text(preview.name).font(.callout.weight(.semibold)).lineLimit(1)
                 EQCurveView(bands: preview.bands, preampDB: 0, showSpectrum: false, rangeDB: preview.displayRangeDB)
                     .frame(height: 110)
+                    .plotWell()
                 Grid(alignment: .leading, verticalSpacing: 3) {
                     GridRow {
                         Text("Preamp").foregroundStyle(.secondary)
@@ -319,7 +322,7 @@ struct ImportSheet: View {
             } else {
                 Spacer()
                 Text("Select a headphone to preview its EQ")
-                    .font(.subheadline).foregroundStyle(.tertiary)
+                    .font(.subheadline).foregroundStyle(.secondary)
                 Spacer()
             }
         }
@@ -364,6 +367,7 @@ struct ImportSheet: View {
                 }
                 EQCurveView(bands: staged.preset.bands, preampDB: 0, showSpectrum: false, rangeDB: staged.preset.displayRangeDB)
                     .frame(height: 80)
+                    .plotWell()
                 ForEach(staged.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
@@ -419,73 +423,5 @@ struct ImportSheet: View {
             staged = nil
             errorMessage = error.localizedDescription
         }
-    }
-}
-
-/// Wrapping row of small gray capsule labels, wrapped by available width.
-struct FlowPills: View {
-    var items: [String]
-
-    var body: some View {
-        FlowLayout(spacing: 4) {
-            ForEach(items, id: \.self) { item in
-                Text(item)
-                    .font(.caption2.weight(.medium))
-                    .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(Capsule().fill(.quaternary.opacity(0.6)))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
-/// Lays subviews out left to right, starting a new centred row when the next
-/// one would not fit the proposed width.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 4
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(subviews, width: proposal.width ?? .infinity)
-        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
-        let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width ?? width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(subviews, width: bounds.width) {
-            var x = bounds.minX + (bounds.width - row.width) / 2
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
-                                      proposal: .unspecified)
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
-        var rows: [Row] = []
-        var row = Row()
-        for (index, subview) in subviews.enumerated() {
-            let size = subview.sizeThatFits(.unspecified)
-            let needed = row.indices.isEmpty ? size.width : row.width + spacing + size.width
-            if !row.indices.isEmpty, needed > width {
-                rows.append(row)
-                row = Row()
-            }
-            row.indices.append(index)
-            row.width = row.indices.count == 1 ? size.width : row.width + spacing + size.width
-            row.height = max(row.height, size.height)
-        }
-        if !row.indices.isEmpty { rows.append(row) }
-        return rows
     }
 }
