@@ -19,6 +19,11 @@ enum ScreenshotRenderer {
             demo.name = "HD 650 · oratory1990"
             demo.source = "AutoEq"
             state.preset = demo
+            // In memory only: screenshot mode must not write the real profile store.
+            if let device = state.currentDevice {
+                state.store.deviceProfiles[device.uid] = DeviceProfile(
+                    deviceUID: device.uid, deviceName: device.name, presetID: demo.id, presetName: demo.name)
+            }
         }
         state.userVolumePercent = 65
 
