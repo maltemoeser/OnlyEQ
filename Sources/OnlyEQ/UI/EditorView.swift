@@ -76,7 +76,7 @@ struct EditorView: View {
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
-        .padding(.bottom, 8)
+        .padding(.vertical, 8)
         .help("Two slots. The selected one is what you hear and edit; the other waits unchanged. Switching is level-matched.")
     }
 
@@ -205,24 +205,27 @@ struct EditorView: View {
     }
 
     private var revertButton: some View {
-        Button("Revert") {
+        Button {
             state.recordingUndo("Revert", undoManager) { state.revertPreset() }
+        } label: {
+            Label("Revert", systemImage: "arrow.counterclockwise")
+                .labelStyle(.iconOnly)
         }
         .disabled(!state.presetIsModified)
-        .help("Discard edits and return to the saved preset")
+        .help("Revert to the saved preset")
+        .accessibilityLabel("Revert to saved preset")
     }
 
     private var bypassToggle: some View {
         Toggle("Bypass", isOn: $state.bypassed)
             .toggleStyle(.button)
-            .help("Hear the unprocessed signal without changing the preset")
+            .keyboardShortcut("b", modifiers: .command)
+            .help("Hear the unprocessed signal without changing the preset (⌘B)")
     }
 
     private var importButton: some View {
-        Button {
+        Button("Import…") {
             importPresentation = ImportPresentation(profileSuggestion: nil)
-        } label: {
-            Label("Import…", systemImage: "square.and.arrow.down")
         }
         .help("Import a preset from a file, text, or the online databases")
     }
@@ -274,10 +277,10 @@ struct EditorView: View {
             }
             .overlay(alignment: .topTrailing) {
                 if state.bypassed {
-                    Label("Bypassed", systemImage: "eye.slash")
+                    Label("Bypassed", systemImage: "waveform.slash")
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
                 } else if bandLimitReached {
-                    Label("32 bands maximum", systemImage: "plus.circle")
+                    Text("32 bands maximum")
                         .font(.caption).foregroundStyle(.secondary).padding(4)
                 } else if state.preset.bands.isEmpty {
                     Label("Double-click graph to add band", systemImage: "plus.circle")
@@ -312,11 +315,23 @@ struct EditorView: View {
 
     // MARK: - Band strip
 
+    /// Cards run low to high in frequency, so the strip reads like the
+    /// graph above it. The order freezes for the length of a node drag so a
+    /// band crossing another does not shuffle the cards under the pointer.
+    private var orderedBands: [EQBand] {
+        let reference = (dragStartPreset ?? state.preset).bands.sorted { $0.frequency < $1.frequency }
+        let current = Dictionary(state.preset.bands.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var ordered = reference.compactMap { current[$0.id] }
+        let known = Set(reference.map(\.id))
+        ordered += state.preset.bands.filter { !known.contains($0.id) }
+        return ordered
+    }
+
     private var bandStrip: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    ForEach(Array(state.preset.bands.enumerated()), id: \.element.id) { index, band in
+                    ForEach(Array(orderedBands.enumerated()), id: \.element.id) { index, band in
                         BandCard(index: index, band: bandBinding(band.id),
                                  isSelected: selectedBandID == band.id,
                                  onDelete: { deleteBand(band.id) })
@@ -767,6 +782,7 @@ struct EditableValueField: View {
                 editing = false
             })
             .labelsHidden()
+            .accessibilityLabel(label)
             .textFieldStyle(.roundedBorder)
             .font(.caption.monospacedDigit())
             .frame(height: 18)

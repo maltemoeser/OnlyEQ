@@ -254,11 +254,14 @@ struct EQCurveView: View, Animatable {
         }
     }
 
+    /// Handles are numbered low to high in frequency, matching the editor's
+    /// band strip; the number reaches only VoiceOver.
     @ViewBuilder
     private func nodeLayer(size: CGSize) -> some View {
-        ForEach(Array(bands.enumerated()), id: \.element.id) { index, band in
+        let byFrequency = bands.sorted { $0.frequency < $1.frequency }.map(\.id)
+        ForEach(bands) { band in
             DraggableBandNode(
-                number: index + 1,
+                number: (byFrequency.firstIndex(of: band.id) ?? 0) + 1,
                 band: band,
                 size: size,
                 rangeDB: rangeDB,

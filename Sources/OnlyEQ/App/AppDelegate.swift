@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         hosting.sizingOptions = .standardBounds
         menuPanel = MenuPanel(
-            contentRect: NSRect(x: 0, y: 0, width: PopoverView.width, height: PopoverView.minHeight),
+            contentRect: NSRect(x: 0, y: 0, width: PopoverView.width, height: 340),
             styleMask: [.borderless], backing: .buffered, defer: false
         )
         menuPanel.contentViewController = hosting
