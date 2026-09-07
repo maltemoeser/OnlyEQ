@@ -202,6 +202,15 @@ enum TestRunner {
             let replacement = EQPreset(name: "Working", preampDB: 0, bands: [EQBand(type: .peak, frequency: 500, gain: 2, q: 1)])
             let stored = corrupt.save(replacement)
             expect(stored.id == edited.id && stored.bands == replacement.bands, "saving under an existing name returns the stored id")
+
+            // A device bound to a preset that no longer exists has no usable
+            // binding; one bound by a stale ID but a live name still resolves.
+            let dead = DeviceProfile(deviceUID: "uid-c", deviceName: "Headphones",
+                                     presetID: UUID(), presetName: "Gone")
+            expect(corrupt.resolveProfilePreset(dead) == nil, "binding to a deleted preset resolves to nothing")
+            let byName = DeviceProfile(deviceUID: "uid-c", deviceName: "Headphones",
+                                       presetID: UUID(), presetName: "Working")
+            expect(corrupt.resolveProfilePreset(byName)?.id == stored.id, "binding resolves by name when the id is stale")
             expect(corrupt.customPresets.count == 1, "saving under an existing name replaces, not appends")
         }
     }

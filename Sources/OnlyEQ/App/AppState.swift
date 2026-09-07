@@ -508,6 +508,25 @@ final class AppState: ObservableObject {
 
     func applyFlat() { apply(.flat) }
 
+    /// The stored preset the current device is bound to, resolved by ID or
+    /// by name, or nil when the device has no usable binding.
+    var boundPresetForCurrentDevice: EQPreset? {
+        guard let device = currentDevice, let profile = store.deviceProfiles[device.uid] else { return nil }
+        return store.resolveProfilePreset(profile)
+    }
+
+    /// True while the preset on screen is the one the current device is
+    /// bound to, so the popover can say so in words.
+    var presetIsBoundToCurrentDevice: Bool {
+        boundPresetForCurrentDevice?.id == preset.id
+    }
+
+    /// Bind the preset on screen to the current device, auto-applied.
+    func bindPresetToCurrentDevice() {
+        guard let device = currentDevice else { return }
+        store.setProfile(deviceUID: device.uid, deviceName: device.name, preset: preset, autoApply: true)
+    }
+
     /// The stored preset the working preset came from, if it still exists.
     var savedPreset: EQPreset? { store.allPresets.first { $0.id == preset.id } }
 

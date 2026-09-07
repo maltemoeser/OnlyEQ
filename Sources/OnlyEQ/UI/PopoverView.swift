@@ -268,11 +268,22 @@ struct PopoverView: View {
         } detail: {
             VStack(alignment: .leading, spacing: 8) {
                 // The binding that makes "set once" work is otherwise
-                // invisible; name it under the preset.
-                Text(presetBindingCaption ?? "Not saved for this device")
+                // invisible; name it under the preset, or offer it.
+                if let caption = presetBindingCaption {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else if let device = state.currentDevice {
+                    Button("Use on \(device.name) automatically") {
+                        state.bindPresetToCurrentDevice()
+                    }
+                    .buttonStyle(.plain)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.accentColor)
                     .lineLimit(1)
+                    .help("Apply this preset whenever \(device.name) becomes the output")
+                }
                 HStack(spacing: 6) {
                     Toggle("Bypass", isOn: $state.bypassed)
                         .help("Hear the unprocessed signal without changing the preset")
@@ -298,7 +309,7 @@ struct PopoverView: View {
     private var presetBindingCaption: String? {
         guard let device = state.currentDevice,
               let profile = state.store.deviceProfiles[device.uid],
-              profile.presetID == state.preset.id else { return nil }
+              state.presetIsBoundToCurrentDevice else { return nil }
         return profile.autoApply ? "Auto on \(device.name)" : "Saved for \(device.name)"
     }
 
