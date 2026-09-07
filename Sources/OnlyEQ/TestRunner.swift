@@ -34,6 +34,7 @@ enum TestRunner {
             undoTests()
             windowUndoRoutingTests()
             displayRangeTests()
+            bandColorTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -618,6 +619,34 @@ enum TestRunner {
         expect(preset(12).displayRangeDB == 12, "a 12 dB band still fits ±12")
         expect(preset(-15.2).displayRangeDB == 18, "a −15 dB band widens to ±18")
         expect(preset(4, 25).displayRangeDB == 30, "a 25 dB band widens to ±30")
+    }
+
+    /// Band colours are identity, not position: they survive deletes, are
+    /// persisted, and never repeat within a preset.
+    private static func bandColorTests() {
+        func band(_ f: Double) -> EQBand { EQBand(type: .peak, frequency: f, gain: 1, q: 1) }
+        var preset = EQPreset(name: "Colours", bands: [band(100), band(200), band(300), band(400)])
+        expect(preset.bands.map(\.colorIndex) == [0, 1, 2, 3], "bands are coloured in order when a preset is built")
+        preset.bands.remove(at: 1)
+        expect(preset.bands.map(\.colorIndex) == [0, 2, 3], "deleting a band keeps the others' colours")
+        preset.bands.append(band(500))
+        expect(preset.bands.last?.colorIndex == 1, "a new band takes the lowest free colour")
+        preset.bands.append(band(600))
+        expect(preset.bands.last?.colorIndex == 4, "the next band takes the next free colour")
+        expect(preset.bands.map(\.colorIndex) == [0, 2, 3, 1, 4], "no two bands share a colour")
+        let plain = band(500)
+        expect(preset.bands[3] == plain, "colour is ignored by band equality")
+        if let data = try? JSONEncoder().encode(preset),
+           let decoded = try? JSONDecoder().decode(EQPreset.self, from: data) {
+            expect(decoded.bands.map(\.colorIndex) == [0, 2, 3, 1, 4], "colours survive a save/load round trip")
+        } else {
+            expect(false, "preset with colours encodes and decodes")
+        }
+        let legacy = Data("""
+        {"id":"6F6C7945-5100-4000-8000-0000000000AA","name":"Old","bands":[{"frequency":100},{"frequency":200}]}
+        """.utf8)
+        let old = try? JSONDecoder().decode(EQPreset.self, from: legacy)
+        expect(old?.bands.map(\.colorIndex) == [0, 1], "presets saved before colours get them on load")
     }
 
     /// The shortcut monitor sends `undo:` up the responder chain; with no main

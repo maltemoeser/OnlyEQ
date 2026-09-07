@@ -549,7 +549,7 @@ struct BandCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                Circle().fill(BandPalette.color(index)).frame(width: 8, height: 8)
+                Circle().fill(BandPalette.color(band.colorIndex ?? index)).frame(width: 8, height: 8)
                 Text("\(index + 1)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Menu {
                     ForEach(FilterType.allCases) { type in
@@ -586,7 +586,7 @@ struct BandCard: View {
                 .fill(Color(nsColor: .controlBackgroundColor))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? BandPalette.color(index) : Color(nsColor: .separatorColor),
+                        .strokeBorder(isSelected ? BandPalette.color(band.colorIndex ?? index) : Color(nsColor: .separatorColor),
                                       lineWidth: isSelected ? 1.5 : 1)
                 )
         )
