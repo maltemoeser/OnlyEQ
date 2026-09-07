@@ -162,6 +162,7 @@ struct EditorView: View {
                 interactive: true,
                 showSpectrum: state.isEnabled && state.editorIsVisible,
                 showIndividualCurves: true,
+                rangeDB: state.preset.displayRangeDB,
                 selectedBandID: $selectedBandID,
                 onBandChange: { id, f, g in
                     guard let i = state.preset.bands.firstIndex(where: { $0.id == id }) else { return }
@@ -184,10 +185,10 @@ struct EditorView: View {
             .opacity(state.bypassed ? 0.45 : 1)
             .animation(.easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
-                Text("+12 dB").font(.caption2).foregroundStyle(.secondary).padding(4)
+                Text("+\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .bottomLeading) {
-                Text("−12 dB").font(.caption2).foregroundStyle(.secondary).padding(4)
+                Text("−\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .topTrailing) {
                 if state.bypassed {
@@ -548,7 +549,7 @@ struct BandCard: View {
                 .accessibilityLabel("Delete band")
             }
             valueRow("Fc", value: $band.frequency, range: 20...20000, format: freqFormat, parse: parseFreq)
-            valueRow("Gain", value: $band.gain, range: -12...12, format: { String(format: "%.1f dB", $0) },
+            valueRow("Gain", value: $band.gain, range: -30...30, format: { String(format: "%.1f dB", $0) },
                      parse: { Double($0.replacingOccurrences(of: "dB", with: "").trimmingCharacters(in: .whitespaces)) })
             valueRow("Q", value: $band.q, range: 0.1...30, format: { String(format: "%.2f", $0) }, parse: { Double($0) })
         }

@@ -176,7 +176,7 @@ struct PopoverView: View {
             VStack(spacing: 5) {
                 EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
                             showSpectrum: state.isEnabled && state.popoverIsVisible,
-                            spectrumStyle: .subtle)
+                            spectrumStyle: .subtle, rangeDB: state.preset.displayRangeDB)
                     .frame(height: 116)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .opacity(state.bypassed ? 0.5 : 1)

@@ -33,6 +33,7 @@ enum TestRunner {
             revertTests()
             undoTests()
             windowUndoRoutingTests()
+            displayRangeTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -604,6 +605,19 @@ enum TestRunner {
             state.recordingUndo("Switch Preset", nil) { state.apply(.flat) }
             expect(state.preset == .flat, "a nil undo manager still applies the change")
         }
+    }
+
+    /// The curve display widens in 6 dB steps so imported bands beyond ±12 dB
+    /// are drawn where they are.
+    private static func displayRangeTests() {
+        func preset(_ gains: Double...) -> EQPreset {
+            EQPreset(name: "Range", bands: gains.map { EQBand(type: .peak, frequency: 1000, gain: $0, q: 1) })
+        }
+        expect(preset().displayRangeDB == 12, "empty preset shows ±12 dB")
+        expect(preset(3, -11.9).displayRangeDB == 12, "gains within ±12 keep the default range")
+        expect(preset(12).displayRangeDB == 12, "a 12 dB band still fits ±12")
+        expect(preset(-15.2).displayRangeDB == 18, "a −15 dB band widens to ±18")
+        expect(preset(4, 25).displayRangeDB == 30, "a 25 dB band widens to ±30")
     }
 
     /// The shortcut monitor sends `undo:` up the responder chain; with no main
