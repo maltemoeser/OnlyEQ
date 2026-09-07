@@ -170,6 +170,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let buttonInWindow = button.convert(button.bounds, to: nil)
         let buttonOnScreen = buttonWindow.convertToScreen(buttonInWindow)
         let screenFrame = buttonWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        // Larger system text makes the content taller; size the panel to it.
+        if let content = menuPanel.contentViewController?.view {
+            menuPanel.setContentSize(content.fittingSize)
+        }
         let panelSize = menuPanel.frame.size
         let x = min(max(buttonOnScreen.midX - panelSize.width / 2, screenFrame.minX + 6),
                     screenFrame.maxX - panelSize.width - 6)

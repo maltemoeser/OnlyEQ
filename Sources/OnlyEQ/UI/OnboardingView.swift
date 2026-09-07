@@ -39,10 +39,10 @@ struct OnboardingView: View {
                 .frame(width: 88, height: 88)
                 .background(RoundedRectangle(cornerRadius: 20).fill(Color.accentColor))
             Text("System-wide EQ\nfor your Mac")
-                .font(.system(size: 24, weight: .bold))
+                .font(.largeTitle.weight(.bold))
                 .multilineTextAlignment(.center)
             Text("Hear your music the way it was meant to sound.")
-                .font(.system(size: 13))
+                .font(.body)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Get Started") { step = 1 }
@@ -57,13 +57,13 @@ struct OnboardingView: View {
         VStack(spacing: 12) {
             Spacer()
             HStack(spacing: 8) {
-                Image(systemName: "menubar.rectangle").font(.system(size: 26)).foregroundStyle(.secondary)
-                Image(systemName: "record.circle").font(.system(size: 18)).foregroundStyle(.purple)
+                Image(systemName: "menubar.rectangle").font(.largeTitle).foregroundStyle(.secondary)
+                Image(systemName: "record.circle").font(.title2).foregroundStyle(.purple)
             }
             Text("Allow System Audio access")
-                .font(.system(size: 20, weight: .bold))
+                .font(.title.weight(.bold))
             Text("macOS shows a recording indicator while EQ is active.\nAudio never leaves your Mac.")
-                .font(.system(size: 12))
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Open System Settings") { PermissionHelper.openSystemSettings() }
@@ -74,11 +74,11 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     if state.engineState == .running && !state.suspectedPermissionIssue {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        Text("Permission granted").font(.system(size: 12, weight: .medium))
+                        Text("Permission granted").font(.callout.weight(.medium))
                     } else {
                         ProgressView().controlSize(.small)
                         Text("Waiting… play some audio to confirm")
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(.callout).foregroundStyle(.secondary)
                     }
                 }
                 .padding(4)
@@ -96,11 +96,11 @@ struct OnboardingView: View {
     private var pickHeadphones: some View {
         VStack(spacing: 10) {
             Text("Search your headphones\nto auto-EQ them")
-                .font(.system(size: 20, weight: .bold))
+                .font(.title.weight(.bold))
                 .multilineTextAlignment(.center)
                 .padding(.top, 18)
             Text("We’ll import a preset tuned for your headphones.")
-                .font(.system(size: 12)).foregroundStyle(.secondary)
+                .font(.callout).foregroundStyle(.secondary)
 
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -122,8 +122,8 @@ struct OnboardingView: View {
                             HStack {
                                 Image(systemName: "headphones").foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(entry.model).font(.system(size: 12, weight: .medium))
-                                    Text(entry.subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                                    Text(entry.model).font(.callout.weight(.medium))
+                                    Text(entry.subtitle).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                             }

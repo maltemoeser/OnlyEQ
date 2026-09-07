@@ -76,7 +76,7 @@ struct EditorView: View {
                     }
                 }
             } label: {
-                Text(state.preset.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                Text(state.preset.name).font(.callout.weight(.medium)).lineLimit(1)
             }
             .frame(maxWidth: 220)
 
@@ -124,6 +124,7 @@ struct EditorView: View {
             }
             .keyboardShortcut(",", modifiers: .command)
             .help("Settings")
+            .accessibilityLabel("Settings")
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
@@ -139,7 +140,7 @@ struct EditorView: View {
             }
             .keyboardShortcut(.cancelAction)
             Spacer()
-            Text("Settings").font(.system(size: 12, weight: .semibold))
+            Text("Settings").font(.callout.weight(.semibold))
             Spacer()
             // Balances the leading button so the title stays centred.
             Label("Equalizer", systemImage: "chevron.left").hidden()
@@ -183,18 +184,18 @@ struct EditorView: View {
             .opacity(state.bypassed ? 0.45 : 1)
             .animation(.easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
-                Text("+12 dB").font(.system(size: 9)).foregroundStyle(.secondary).padding(4)
+                Text("+12 dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .bottomLeading) {
-                Text("−12 dB").font(.system(size: 9)).foregroundStyle(.secondary).padding(4)
+                Text("−12 dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .topTrailing) {
                 if state.bypassed {
                     Label("Bypassed", systemImage: "eye.slash")
-                        .font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary).padding(4)
+                        .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
                 } else {
                     Label("Double-click graph to add band", systemImage: "plus.circle")
-                        .font(.system(size: 10)).foregroundStyle(.tertiary).padding(4)
+                        .font(.caption).foregroundStyle(.tertiary).padding(4)
                 }
             }
             FrequencyAxisLabels()
@@ -218,7 +219,7 @@ struct EditorView: View {
                     addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 16))
+                        .font(.title3)
                         .frame(width: 44, height: 100)
                 }
                 .buttonStyle(.plain)
@@ -269,7 +270,7 @@ struct EditorView: View {
     private var bottomBar: some View {
         HStack(spacing: 12) {
             Text("Preamp")
-                .font(.system(size: 11))
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
@@ -358,7 +359,7 @@ private struct ManualPreampControl: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(String(format: "%.1f dB", trackedValue ?? effectiveValue))
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .font(.subheadline.weight(.medium).monospacedDigit())
                 .frame(width: 52, alignment: .trailing)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
@@ -428,8 +429,9 @@ private final class PeakMeterNSView: NSView {
         dotLayer.actions = ["path": NSNull(), "fillColor": NSNull()]
         textLayer.actions = ["string": NSNull(), "foregroundColor": NSNull(),
                              "bounds": NSNull(), "position": NSNull()]
-        textLayer.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
-        textLayer.fontSize = 10
+        let pointSize = NSFont.preferredFont(forTextStyle: .caption1).pointSize
+        textLayer.font = NSFont.monospacedDigitSystemFont(ofSize: pointSize, weight: .regular)
+        textLayer.fontSize = pointSize
         textLayer.alignmentMode = .left
         layer?.addSublayer(dotLayer)
         layer?.addSublayer(textLayer)
@@ -521,13 +523,13 @@ struct BandCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Circle().fill(BandPalette.color(index)).frame(width: 8, height: 8)
-                Text("\(index + 1)").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text("\(index + 1)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Menu {
                     ForEach(FilterType.allCases) { type in
                         Button(type.displayName) { band.type = type }
                     }
                 } label: {
-                    Text(band.type.displayName).font(.system(size: 10))
+                    Text(band.type.displayName).font(.caption)
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -536,7 +538,7 @@ struct BandCard: View {
                     onDelete()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .frame(width: 18, height: 18)
                         .contentShape(Rectangle())
                 }
@@ -588,10 +590,10 @@ struct BandCard: View {
                           format: @escaping (Double) -> String,
                           parse: @escaping (String) -> Double?) -> some View {
         HStack(spacing: 4) {
-            Text(label).font(.system(size: 9)).foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
+            Text(label).font(.caption2).foregroundStyle(.secondary).frame(width: 28, alignment: .leading)
             // The draft carries the exact unitless value so a band shown as
             // "1.5 kHz" edits as "1534", not "1.5" (which would parse as 1.5 Hz).
-            EditableValueField(text: format(value.wrappedValue),
+            EditableValueField(label: label, text: format(value.wrappedValue),
                                editText: String(format: "%g", value.wrappedValue)) { input in
                 if let parsed = parse(input), parsed.isFinite {
                     value.wrappedValue = min(max(parsed, range.lowerBound), range.upperBound)
@@ -601,35 +603,47 @@ struct BandCard: View {
     }
 }
 
-/// A tiny click-to-edit text field for band values.
+/// A tiny click-to-edit text field for band values. The resting state is a
+/// button, so the value can be reached by keyboard and read by VoiceOver.
 struct EditableValueField: View {
+    var label: String
     var text: String
     var editText: String
     var onCommit: (String) -> Void
 
     @State private var editing = false
     @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         if editing {
-            TextField("", text: $draft, onCommit: {
+            TextField(label, text: $draft, onCommit: {
                 onCommit(draft)
                 editing = false
             })
+            .labelsHidden()
             .textFieldStyle(.roundedBorder)
-            .font(.system(size: 10).monospacedDigit())
+            .font(.caption.monospacedDigit())
             .frame(height: 18)
+            .focused($fieldFocused)
+            .onAppear { fieldFocused = true }
             .onExitCommand { editing = false }
         } else {
-            Text(text)
-                .font(.system(size: 10).monospacedDigit())
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.vertical, 2).padding(.horizontal, 4)
-                .background(RoundedRectangle(cornerRadius: 4).fill(.quaternary.opacity(0.5)))
-                .onTapGesture {
-                    draft = editText
-                    editing = true
-                }
+            Button {
+                draft = editText
+                editing = true
+            } label: {
+                Text(text)
+                    .font(.caption.monospacedDigit())
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.vertical, 2).padding(.horizontal, 4)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(.quaternary.opacity(0.5)))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+            .accessibilityValue(text)
+            .accessibilityHint("Edit")
         }
     }
 }

@@ -76,9 +76,9 @@ struct ImportSheet: View {
                     .font(.system(size: 34))
                     .foregroundStyle(.secondary)
                 Text("Drop any EQ preset")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                 Text("Drop a file here to import")
-                    .font(.system(size: 11))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Button("Choose File…") { chooseFile() }
             }
@@ -93,7 +93,7 @@ struct ImportSheet: View {
             }
 
             VStack(spacing: 6) {
-                Text("Supported formats").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text("Supported formats").font(.caption).foregroundStyle(.tertiary)
                 FlowPills(items: ["AutoEq", "Equalizer APO", "peqdb", "Wavelet / GraphicEQ",
                                   "Poweramp JSON", "OPRA JSON", "Peace", "REW", "eqMac"])
             }
@@ -129,7 +129,7 @@ struct ImportSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Paste EQ data or presets in any supported text format.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
                 Spacer()
                 Button("Clear") {
                     pastedText = ""
@@ -140,12 +140,12 @@ struct ImportSheet: View {
                 .disabled(pastedText.isEmpty)
             }
             TextEditor(text: $pastedText)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(.subheadline, design: .monospaced))
                 .frame(minHeight: 150)
                 .overlay(alignment: .topLeading) {
                     if pastedText.isEmpty {
                         Text("Preamp: -6.1 dB\nFilter 1: ON PK Fc 105 Hz Gain 6.4 dB Q 0.70")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.subheadline, design: .monospaced))
                             .foregroundStyle(.tertiary)
                             .padding(.top, 1).padding(.leading, 5)
                             .allowsHitTesting(false)
@@ -182,13 +182,13 @@ struct ImportSheet: View {
                     Image(systemName: "headphones.circle.fill").foregroundStyle(Color.accentColor)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("New headphones detected")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                         Text(profileSuggestion.deviceName)
-                            .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
                     Text("Review before applying")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.09)))
@@ -261,8 +261,8 @@ struct ImportSheet: View {
             }
         )) { entry in
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.model).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                Text(entry.subtitle).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                Text(entry.model).font(.callout.weight(.medium)).lineLimit(1)
+                Text(entry.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .tag(entry.id)
         }
@@ -277,7 +277,7 @@ struct ImportSheet: View {
                 ProgressView()
                 Spacer()
             } else if let preview = previewPreset {
-                Text(preview.name).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text(preview.name).font(.callout.weight(.semibold)).lineLimit(1)
                 EQCurveView(bands: preview.bands, preampDB: 0, showSpectrum: false)
                     .frame(height: 110)
                 Grid(alignment: .leading, verticalSpacing: 3) {
@@ -294,17 +294,17 @@ struct ImportSheet: View {
                         Text(preview.source ?? "—")
                     }
                 }
-                .font(.system(size: 10))
+                .font(.caption)
                 Spacer()
             } else if let errorMessage {
                 Spacer()
                 Label(errorMessage, systemImage: "xmark.octagon")
-                    .font(.system(size: 11)).foregroundStyle(.red)
+                    .font(.subheadline).foregroundStyle(.red)
                 Spacer()
             } else {
                 Spacer()
                 Text("Select a headphone to preview its EQ")
-                    .font(.system(size: 11)).foregroundStyle(.tertiary)
+                    .font(.subheadline).foregroundStyle(.tertiary)
                 Spacer()
             }
         }
@@ -342,21 +342,21 @@ struct ImportSheet: View {
         if let staged {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Live preview").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("Live preview").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text("\(staged.preset.bands.count) filters recognized · \(staged.detectedFormat)")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 EQCurveView(bands: staged.preset.bands, preampDB: 0, showSpectrum: false)
                     .frame(height: 80)
                 ForEach(staged.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
-                        .font(.system(size: 10)).foregroundStyle(.orange)
+                        .font(.caption).foregroundStyle(.orange)
                 }
             }
         } else if let errorMessage {
             Label(errorMessage, systemImage: "xmark.octagon")
-                .font(.system(size: 11)).foregroundStyle(.red)
+                .font(.subheadline).foregroundStyle(.red)
         }
     }
 
@@ -417,7 +417,7 @@ struct FlowPills: View {
                 HStack(spacing: 4) {
                     ForEach(row, id: \.self) { item in
                         Text(item)
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.caption2.weight(.medium))
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Capsule().fill(.quaternary.opacity(0.6)))
                             .foregroundStyle(.secondary)

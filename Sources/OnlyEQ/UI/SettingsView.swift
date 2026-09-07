@@ -118,12 +118,16 @@ struct DeviceSettings: View {
                     Button {
                         pickApp()
                     } label: { Image(systemName: "plus") }
+                        .help("Add app")
+                        .accessibilityLabel("Add app")
                     Button {
                         if let selected = selectedExcluded {
                             state.excludedBundleIDs.remove(selected)
                             selectedExcluded = nil
                         }
                     } label: { Image(systemName: "minus") }
+                        .help("Remove app")
+                        .accessibilityLabel("Remove app")
                         .disabled(selectedExcluded == nil)
                     Spacer()
                 }
@@ -156,7 +160,7 @@ struct DeviceSettings: View {
                 }
             } label: {
                 Text(profile?.presetName ?? "None")
-                    .font(.system(size: 11))
+                    .font(.subheadline)
             }
             .frame(maxWidth: 190)
             Toggle("", isOn: Binding(
@@ -214,7 +218,7 @@ struct ShortcutSettings: View {
                         Text(action.title)
                         Spacer()
                         Text(action.chordDescription)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(.subheadline, design: .monospaced))
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(RoundedRectangle(cornerRadius: 5).fill(.quaternary.opacity(0.6)))
                         Toggle("", isOn: Binding(
@@ -254,7 +258,7 @@ struct SoundSettings: View {
                             Text("Ceiling")
                         }
                         Text(String(format: "%.1f dBFS", state.limiterCeilingDB))
-                            .font(.system(size: 11).monospacedDigit())
+                            .font(.subheadline.monospacedDigit())
                             .frame(width: 64, alignment: .trailing)
                     }
                 }
@@ -277,7 +281,7 @@ struct SoundSettings: View {
                                 Text("Amount")
                             }
                             Text(String(format: "%.1f dB", state.crossfeedLevelDB))
-                                .font(.system(size: 11).monospacedDigit())
+                                .font(.subheadline.monospacedDigit())
                                 .frame(width: 64, alignment: .trailing)
                         }
                         LabeledContent("Cutoff") {
@@ -285,7 +289,7 @@ struct SoundSettings: View {
                                 Text("Cutoff")
                             }
                             Text(String(format: "%.0f Hz", state.crossfeedCutoffHz))
-                                .font(.system(size: 11).monospacedDigit())
+                                .font(.subheadline.monospacedDigit())
                                 .frame(width: 64, alignment: .trailing)
                         }
                     }
@@ -301,7 +305,7 @@ struct SoundSettings: View {
                     LabeledContent {
                         HStack {
                             Text("\(Int(state.loudnessReferencePercent))%")
-                                .font(.system(size: 11).monospacedDigit())
+                                .font(.subheadline.monospacedDigit())
                             Button("Use Current Volume") {
                                 state.loudnessReferencePercent = state.volumePercent
                             }
