@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var searchText = ""
     @State private var isApplying = false
+    @State private var selectedEntryID: OnlineEntry.ID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,7 +69,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
             Button("Open System Settings") { PermissionHelper.openSystemSettings() }
                 .buttonStyle(.borderedProminent)
-            Button("I’ve enabled it →") { step = 2 }
+            Button("I’ve enabled it") { step = 2 }
 
             GroupBox {
                 HStack(spacing: 8) {
@@ -115,20 +116,20 @@ struct OnboardingView: View {
                 if state.onlineDB.isLoading {
                     ProgressView().frame(maxHeight: .infinity)
                 } else {
-                    List(matches) { entry in
-                        Button {
-                            applyEntry(entry)
-                        } label: {
-                            HStack {
-                                Image(systemName: "headphones").foregroundStyle(.secondary)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(entry.model).font(.callout.weight(.medium))
-                                    Text(entry.subtitle).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
+                    // Selecting a row only highlights it; "Start Listening"
+                    // commits, so the primary button has a job of its own.
+                    List(matches, selection: $selectedEntryID) { entry in
+                        HStack {
+                            Image(systemName: "headphones").foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(entry.model).font(.callout.weight(.medium))
+                                Text(entry.subtitle).font(.caption).foregroundStyle(.secondary)
                             }
+                            Spacer()
                         }
-                        .buttonStyle(.plain)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) { applyEntry(entry) }
+                        .tag(entry.id)
                     }
                     .listStyle(.inset)
                 }
@@ -141,13 +142,20 @@ struct OnboardingView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Start Listening") { finish(apply: nil) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isApplying)
+                Button("Start Listening") {
+                    if let entry = selectedEntry { applyEntry(entry) }
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(isApplying || selectedEntry == nil)
             }
             .padding(16)
         }
         .task { await state.onlineDB.load(source: .peqdb) }
+    }
+
+    private var selectedEntry: OnlineEntry? {
+        matches.first { $0.id == selectedEntryID }
     }
 
     private var matches: [OnlineEntry] {
