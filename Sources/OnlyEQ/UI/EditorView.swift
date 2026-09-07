@@ -61,6 +61,24 @@ struct EditorView: View {
         }
     }
 
+    // MARK: - A/B
+
+    private func abSlotIsFilled(_ slot: Int) -> Bool {
+        slot == state.abSlot || state.otherABSlotIsFilled
+    }
+
+    private var abStatus: String {
+        let other = state.abSlot == 0 ? "B" : "A"
+        return state.otherABSlotIsFilled ? "\(other) holds a curve" : "\(other) is empty"
+    }
+
+    private var abHelp: String {
+        let other = state.abSlot == 0 ? "B" : "A"
+        return state.otherABSlotIsFilled
+            ? "Compare two versions. Switching stores the current curve in the slot you leave."
+            : "Compare two versions. \(other) is empty; switching copies the current curve into it."
+    }
+
     // MARK: - Toolbar
 
     private var toolbar: some View {
@@ -97,16 +115,33 @@ struct EditorView: View {
 
             Spacer()
 
-            Picker("", selection: Binding(
+            Picker("A/B", selection: Binding(
                 get: { state.abSlot },
-                set: { state.storeABAndSwitch(to: $0) }
+                set: { state.storeABAndSwitch(to: $0, undoManager: undoManager) }
             )) {
                 Text("A").tag(0)
                 Text("B").tag(1)
             }
             .pickerStyle(.segmented)
-            .frame(width: 90)
-            .help("Compare two versions. Switching stores the current curve in the slot you leave.")
+            .labelsHidden()
+            .fixedSize()
+            // A dot under each slot that holds a curve, so an empty slot is
+            // visible before the first switch copies into it.
+            .overlay(alignment: .bottom) {
+                HStack(spacing: 0) {
+                    ForEach(0..<2, id: \.self) { slot in
+                        Circle()
+                            .fill(abSlotIsFilled(slot) ? Color.secondary : .clear)
+                            .frame(width: 3, height: 3)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 2)
+                .allowsHitTesting(false)
+            }
+            .accessibilityValue(abStatus)
+            .help(abHelp)
 
             Toggle("Bypass", isOn: $state.bypassed)
                 .toggleStyle(.button)

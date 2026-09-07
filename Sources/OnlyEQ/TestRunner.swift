@@ -36,6 +36,7 @@ enum TestRunner {
             displayRangeTests()
             bandColorTests()
             bandNudgeTests()
+            abUndoTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -620,6 +621,43 @@ enum TestRunner {
         expect(preset(12).displayRangeDB == 12, "a 12 dB band still fits ±12")
         expect(preset(-15.2).displayRangeDB == 18, "a −15 dB band widens to ±18")
         expect(preset(4, 25).displayRangeDB == 30, "a 25 dB band widens to ±30")
+    }
+
+    private static func abUndoTests() {
+        MainActor.assumeIsolated {
+            AppState.screenshotMode = true
+            let state = AppState.shared
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            let a = EQPreset(name: "A", bands: [EQBand(type: .peak, frequency: 1000, gain: 3, q: 1)])
+            state.apply(a)
+            if state.abSlot != 0 { state.storeABAndSwitch(to: 0) }
+            expect(!state.otherABSlotIsFilled || state.abSlot == 0, "test starts in slot A")
+
+            undo.beginUndoGrouping()
+            state.storeABAndSwitch(to: 1, undoManager: undo)
+            undo.endUndoGrouping()
+            expect(state.abSlot == 1, "switching selects slot B")
+            expect(state.preset == a, "an empty B starts as a copy of A")
+            expect(state.otherABSlotIsFilled, "A holds the curve that was left")
+            expect(undo.undoActionName == "Switch A/B", "the switch is an undo step")
+
+            state.preset.bands[0].gain = -4
+            let b = state.preset
+            undo.beginUndoGrouping()
+            state.storeABAndSwitch(to: 0, undoManager: undo)
+            undo.endUndoGrouping()
+            expect(state.preset == a, "switching back restores A")
+
+            undo.undo()
+            expect(state.abSlot == 1 && state.preset == b, "undo returns to B with its edit")
+            undo.redo()
+            expect(state.abSlot == 0 && state.preset == a, "redo goes to A again")
+
+            undo.removeAllActions()
+            state.storeABAndSwitch(to: 0, undoManager: undo)
+            expect(!undo.canUndo, "switching to the active slot registers nothing")
+        }
     }
 
     private static func bandNudgeTests() {

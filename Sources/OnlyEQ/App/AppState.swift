@@ -602,10 +602,40 @@ final class AppState: ObservableObject {
 
     // MARK: - A/B
 
-    func storeABAndSwitch(to slot: Int) {
+    /// True when the slot not currently in use already holds a curve. Until
+    /// then, switching copies the current curve into it.
+    var otherABSlotIsFilled: Bool { abPresets[1 - abSlot] != nil }
+
+    private struct ABSnapshot {
+        var preset: EQPreset
+        var slot: Int
+        var slots: [EQPreset?]
+    }
+
+    private var abSnapshot: ABSnapshot { ABSnapshot(preset: preset, slot: abSlot, slots: abPresets) }
+
+    /// Stores the current curve in the active slot and switches to `slot`.
+    /// The switch is one undo step that also puts the slots back.
+    func storeABAndSwitch(to slot: Int, undoManager: UndoManager? = nil) {
+        guard slot != abSlot else { return }
+        let before = abSnapshot
         abPresets[abSlot] = preset
         abSlot = slot
         if let other = abPresets[slot] { preset = other }
+        registerABUndo(restoring: before, undoManager: undoManager)
+    }
+
+    private func registerABUndo(restoring snapshot: ABSnapshot, undoManager: UndoManager?) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { state in
+            let current = state.abSnapshot
+            state.abPresets = snapshot.slots
+            state.abSlot = snapshot.slot
+            state.preset = snapshot.preset
+            state.flushWorkingPresetPersistence()
+            state.registerABUndo(restoring: current, undoManager: undoManager)
+        }
+        undoManager.setActionName("Switch A/B")
     }
 
     // MARK: - Volume
