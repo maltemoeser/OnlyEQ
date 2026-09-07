@@ -368,8 +368,10 @@ struct BoostSlider: View {
                 ZStack(alignment: .topLeading) {
                     Text("0%")
                         .position(x: sliderPosition(for: 0, width: width), y: 5)
-                    Text("100%")
-                        .position(x: sliderPosition(for: hundred, width: width), y: 5)
+                    if maxPercent > 100 {
+                        Text("100%")
+                            .position(x: sliderPosition(for: hundred, width: width), y: 5)
+                    }
                     Text("\(Int(maxPercent))%")
                         .position(x: sliderPosition(for: 1, width: width), y: 5)
                 }

@@ -3,8 +3,16 @@ import AppKit
 import QuartzCore
 
 enum BandPalette {
-    static let colors: [Color] = [.blue, .teal, .purple, .pink, .orange, .green, .indigo, .mint, .red, .cyan]
-    static func color(_ index: Int) -> Color { colors[index % colors.count] }
+    static let colors: [Color] = [.blue, .teal, .purple, .pink, .orange, .green, .indigo, .mint, .red, .cyan,
+                                  .yellow, .brown]
+
+    /// Named system colours first; past them, hues spaced by the golden ratio
+    /// so a 32-band preset never repeats a handle colour.
+    static func color(_ index: Int) -> Color {
+        if index < colors.count { return colors[index] }
+        let hue = (Double(index - colors.count) * 0.618_033_988_75 + 0.08).truncatingRemainder(dividingBy: 1)
+        return Color(hue: hue, saturation: 0.6, brightness: 0.95)
+    }
 }
 
 /// Frequency responses depend on filter parameters, not view dimensions. Keep

@@ -229,34 +229,47 @@ struct EditorView: View {
     // MARK: - Band strip
 
     private var bandStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Array(state.preset.bands.enumerated()), id: \.element.id) { index, band in
-                    BandCard(index: index, band: bandBinding(band.id),
-                             isSelected: selectedBandID == band.id,
-                             onDelete: { deleteBand(band.id) })
-                        .onTapGesture { selectedBandID = band.id }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(Array(state.preset.bands.enumerated()), id: \.element.id) { index, band in
+                        BandCard(index: index, band: bandBinding(band.id),
+                                 isSelected: selectedBandID == band.id,
+                                 onDelete: { deleteBand(band.id) })
+                            .onTapGesture { selectedBandID = band.id }
+                            .id(band.id)
+                    }
+                    addBandButton
                 }
-                Button {
-                    addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.title3)
-                        .frame(width: 44, height: 100)
-                }
-                .buttonStyle(.plain)
-                .help("Add band")
-                .accessibilityLabel("Add band")
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                        .foregroundStyle(.tertiary)
-                )
+                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
+            // Selecting a handle on the graph brings its card into view, so a
+            // 32-band preset never hides the card being edited.
+            .onChange(of: selectedBandID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+            }
         }
         .frame(height: 122)
+    }
+
+    private var addBandButton: some View {
+        Button {
+            addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
+        } label: {
+            Image(systemName: "plus")
+                .font(.title3)
+                .frame(width: 44, height: 100)
+        }
+        .buttonStyle(.plain)
+        .help("Add band")
+        .accessibilityLabel("Add band")
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                .foregroundStyle(.tertiary)
+        )
     }
 
     private func bandBinding(_ id: UUID) -> Binding<EQBand> {
