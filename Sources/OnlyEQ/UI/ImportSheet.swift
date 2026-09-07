@@ -9,6 +9,7 @@ struct ImportSheet: View {
 
     enum Tab: String, CaseIterable { case drop = "Drop file", paste = "Paste text", browse = "Browse online" }
     @State private var tab: Tab = .drop
+    @State private var isDropTargeted = false
 
     // Shared staged result.
     @State private var staged: PresetImporter.ImportResult?
@@ -85,10 +86,14 @@ struct ImportSheet: View {
             .frame(maxWidth: .infinity, minHeight: 200)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                    .foregroundStyle(.tertiary)
+                    .fill(isDropTargeted ? Color.accentColor.opacity(0.08) : .clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(style: StrokeStyle(lineWidth: isDropTargeted ? 2 : 1.5, dash: [6]))
+                            .foregroundStyle(isDropTargeted ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
+                    )
             )
-            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDrop(providers)
             }
 
@@ -213,7 +218,10 @@ struct ImportSheet: View {
                 Spacer()
             } else if let error = state.onlineDB.error {
                 Spacer()
-                Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.secondary)
+                VStack(spacing: 10) {
+                    Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.secondary)
+                    Button("Retry") { Task { await state.onlineDB.load(source: source) } }
+                }
                 Spacer()
             } else {
                 HSplitView {
@@ -269,6 +277,11 @@ struct ImportSheet: View {
         }
         .listStyle(.inset)
         .frame(minWidth: 220)
+        .overlay {
+            if filteredEntries.isEmpty, !searchText.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            }
+        }
     }
 
     private var previewPane: some View {
@@ -301,6 +314,7 @@ struct ImportSheet: View {
                 Spacer()
                 Label(errorMessage, systemImage: "xmark.octagon")
                     .font(.subheadline).foregroundStyle(.red)
+                Button("Retry") { fetchPreview() }.controlSize(.small)
                 Spacer()
             } else {
                 Spacer()

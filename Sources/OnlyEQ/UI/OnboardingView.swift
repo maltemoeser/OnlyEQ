@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var searchText = ""
     @State private var isApplying = false
+    @State private var applyError: String?
     @State private var selectedEntryID: OnlineEntry.ID?
 
     var body: some View {
@@ -115,6 +116,12 @@ struct OnboardingView: View {
             Group {
                 if state.onlineDB.isLoading {
                     ProgressView().frame(maxHeight: .infinity)
+                } else if let error = state.onlineDB.error {
+                    VStack(spacing: 10) {
+                        Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.secondary)
+                        Button("Retry") { Task { await state.onlineDB.load(source: .peqdb) } }
+                    }
+                    .frame(maxHeight: .infinity)
                 } else {
                     // Selecting a row only highlights it; "Start Listening"
                     // commits, so the primary button has a job of its own.
@@ -132,10 +139,21 @@ struct OnboardingView: View {
                         .tag(entry.id)
                     }
                     .listStyle(.inset)
+                    .overlay {
+                        if matches.isEmpty, !searchText.isEmpty {
+                            ContentUnavailableView.search(text: searchText)
+                        }
+                    }
                 }
             }
             .frame(maxHeight: .infinity)
             .padding(.horizontal, 12)
+
+            if let applyError {
+                Label(applyError, systemImage: "wifi.exclamationmark")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+            }
 
             HStack {
                 Button("Skip — start flat") { finish(apply: nil) }
@@ -169,10 +187,14 @@ struct OnboardingView: View {
 
     private func applyEntry(_ entry: OnlineEntry) {
         isApplying = true
+        applyError = nil
         Task {
             defer { isApplying = false }
-            if let preset = try? await OnlineDatabase.fetchPreset(for: entry) {
+            do {
+                let preset = try await OnlineDatabase.fetchPreset(for: entry)
                 finish(apply: state.store.save(preset))
+            } catch {
+                applyError = "Couldn’t load that preset (\(error.localizedDescription)). Check your connection and press Start Listening again."
             }
         }
     }
