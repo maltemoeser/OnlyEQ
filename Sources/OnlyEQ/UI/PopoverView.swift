@@ -134,7 +134,9 @@ struct PopoverView: View {
                         Divider()
                         Menu("Delete Preset") {
                             ForEach(state.store.customPresets) { preset in
-                                Button(preset.name, role: .destructive) { state.store.delete(preset) }
+                                Button(preset.name, role: .destructive) {
+                                WindowManager.shared.confirmDeletePreset(preset)
+                            }
                             }
                         }
                     }

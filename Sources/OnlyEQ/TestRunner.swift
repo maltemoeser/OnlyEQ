@@ -31,6 +31,8 @@ enum TestRunner {
             dspTests()
             watchdogTests()
             revertTests()
+            undoTests()
+            windowUndoRoutingTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -547,6 +549,75 @@ enum TestRunner {
             state.store.delete(saved)
             state.apply(.flat)
             expect(!state.presetIsModified, "built-in preset with no edits is not modified")
+        }
+    }
+
+    /// Preset edits register with an undo manager one step per user action; a
+    /// drag registers once at its end; a no-op change registers nothing.
+    private static func undoTests() {
+        MainActor.assumeIsolated {
+            AppState.screenshotMode = true  // no engine, no persistence
+            let state = AppState.shared
+            let undo = UndoManager()
+            undo.groupsByEvent = false  // no run loop here; group by hand
+
+            state.apply(EQPreset(name: "Undo Test",
+                                 bands: [EQBand(type: .peak, frequency: 1000, gain: 3, q: 1)]))
+            let original = state.preset
+
+            undo.beginUndoGrouping()
+            state.recordingUndo("Add Band", undo) {
+                state.preset.bands.append(EQBand(type: .peak, frequency: 2000, gain: -2, q: 2))
+            }
+            undo.endUndoGrouping()
+            expect(state.preset.bands.count == 2, "add band appends")
+            expect(undo.canUndo, "add band registers an undo step")
+            expect(undo.undoActionName == "Add Band", "undo step carries the action name")
+
+            undo.undo()
+            expect(state.preset == original, "undo restores the preset before the add")
+            expect(undo.canRedo, "undo leaves a redo step")
+            undo.redo()
+            expect(state.preset.bands.count == 2, "redo re-adds the band")
+
+            // No group is opened here: an unchanged preset must register nothing.
+            state.recordingUndo("Edit Band", undo) { state.preset.bands[0].gain = 3 }
+            expect(undo.undoActionName == "Add Band", "a change that leaves the preset equal registers nothing")
+
+            // A drag: many mutations, one snapshot registered at the end.
+            let beforeDrag = state.preset
+            for step in 1...20 { state.preset.bands[0].gain = 3 + Double(step) * 0.1 }
+            undo.beginUndoGrouping()
+            state.registerUndo(restoring: beforeDrag, actionName: "Move Band", undoManager: undo)
+            undo.endUndoGrouping()
+            undo.undo()
+            expect(state.preset == beforeDrag, "one undo step reverts the whole drag")
+
+            undo.beginUndoGrouping()
+            state.recordingUndo("Delete Band", undo) { state.preset.bands.removeAll { $0.frequency == 2000 } }
+            undo.endUndoGrouping()
+            expect(state.preset.bands.count == 1, "delete band removes it")
+            undo.undo()
+            expect(state.preset.bands.count == 2, "undo brings the deleted band back")
+            expect(state.preset.bands[1].frequency == 2000, "restored band keeps its values")
+
+            state.recordingUndo("Switch Preset", nil) { state.apply(.flat) }
+            expect(state.preset == .flat, "a nil undo manager still applies the change")
+        }
+    }
+
+    /// The shortcut monitor sends `undo:` up the responder chain; with no main
+    /// menu, the window itself must answer it from its own undo manager.
+    private static func windowUndoRoutingTests() {
+        final class Flag { var undone = false }
+        MainActor.assumeIsolated {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            let flag = Flag()
+            window.undoManager?.registerUndo(withTarget: flag) { $0.undone = true }
+            expect(window.undoManager?.canUndo == true, "window lazily provides an undo manager")
+            expect(window.tryToPerform(Selector(("undo:")), with: nil), "window answers undo: from the responder chain")
+            expect(flag.undone, "undo: sent to the window runs the registered step")
         }
     }
 
