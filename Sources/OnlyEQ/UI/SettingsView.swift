@@ -337,7 +337,7 @@ struct AdvancedSettings: View {
                 Text("1024 frames").tag(1024)
             } label: {
                 Text("Buffer Size")
-                Text("Larger = more stable, more latency. Current latency ≈ \(state.latencyMilliseconds) ms.")
+                Text("Larger buffers are more stable but add latency. Current latency is about \(state.latencyMilliseconds) ms.")
             }
 
             Picker(selection: $state.maxBoostPercent) {

@@ -202,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(enable)
         menu.addItem(.separator())
 
-        let editor = NSMenuItem(title: "Open Editor…", action: #selector(openEditor), keyEquivalent: "")
+        let editor = NSMenuItem(title: "Open Equalizer…", action: #selector(openEditor), keyEquivalent: "")
         editor.target = self
         menu.addItem(editor)
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -254,7 +254,7 @@ final class WindowManager {
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered, defer: false
             )
-            window.title = "OnlyEQ"
+            window.title = "Equalizer"
             window.minSize = NSSize(width: 720, height: 480)
             window.isReleasedWhenClosed = false
             let hosting = NSHostingController(
