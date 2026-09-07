@@ -162,9 +162,10 @@ struct ImportSheet: View {
                         errorMessage = nil
                         return
                     }
-                    // Let multi-line paste and ordinary typing settle before parsing.
+                    // Let multi-line paste and ordinary typing settle before parsing,
+                    // so a half-typed line does not flash an error.
                     parseTask = Task {
-                        guard (try? await Task.sleep(for: .milliseconds(250))) != nil else { return }
+                        guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
                         stage { try PresetImporter.importText(text) }
                     }
                 }

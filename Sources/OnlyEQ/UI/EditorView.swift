@@ -100,7 +100,7 @@ struct EditorView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 90)
-            .help("A/B compare")
+            .help("Compare two versions. Switching stores the current curve in the slot you leave.")
 
             Toggle("Bypass", isOn: $state.bypassed)
                 .toggleStyle(.button)
@@ -186,6 +186,11 @@ struct EditorView: View {
             .overlay(alignment: .bottomLeading) {
                 Text("−\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
+            .overlay(alignment: .bottomTrailing) {
+                if state.isEnabled && !state.bypassed {
+                    spectrumLegend
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 if state.bypassed {
                     Label("Bypassed", systemImage: "eye.slash")
@@ -199,6 +204,26 @@ struct EditorView: View {
         }
         .padding(.horizontal, 24)
         .padding(.top, 6)
+    }
+
+    /// Names the two spectra: grey is what comes in, accent is what goes out.
+    private var spectrumLegend: some View {
+        HStack(spacing: 10) {
+            legendItem("Input", color: .secondary.opacity(0.6))
+            legendItem("Output", color: Color.accentColor)
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+        .padding(4)
+        .help("Grey bars show the audio before EQ; accent bars show it after.")
+        .accessibilityElement(children: .combine)
+    }
+
+    private func legendItem(_ title: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 7, height: 7)
+            Text(title)
+        }
     }
 
     // MARK: - Band strip
