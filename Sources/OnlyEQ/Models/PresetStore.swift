@@ -84,6 +84,12 @@ final class PresetStore: ObservableObject {
         workingPresets[uid]
     }
 
+    /// Forget a device entirely: no preset, no auto-apply, as if never seen.
+    func removeProfile(deviceUID: String) {
+        deviceProfiles[deviceUID] = nil
+        persist()
+    }
+
     func setProfile(deviceUID: String, deviceName: String, preset: EQPreset?, autoApply: Bool = true) {
         deviceProfiles[deviceUID] = DeviceProfile(
             deviceUID: deviceUID, deviceName: deviceName,

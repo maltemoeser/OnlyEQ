@@ -211,6 +211,11 @@ enum TestRunner {
             let byName = DeviceProfile(deviceUID: "uid-c", deviceName: "Headphones",
                                        presetID: UUID(), presetName: "Working")
             expect(corrupt.resolveProfilePreset(byName)?.id == stored.id, "binding resolves by name when the id is stale")
+
+            corrupt.setProfile(deviceUID: "uid-c", deviceName: "Headphones", preset: stored)
+            corrupt.removeProfile(deviceUID: "uid-c")
+            expect(corrupt.deviceProfiles["uid-c"] == nil, "removing a profile forgets the device")
+            expect(PresetStore(directory: dir).deviceProfiles["uid-c"] == nil, "removed profile stays removed on disk")
             expect(corrupt.customPresets.count == 1, "saving under an existing name replaces, not appends")
         }
     }
