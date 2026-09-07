@@ -454,9 +454,11 @@ private struct ManualPreampControl: View {
         HStack(spacing: 12) {
             Text(String(format: "%.1f dB", trackedValue ?? effectiveValue))
                 .font(.subheadline.weight(.medium).monospacedDigit())
+                .foregroundStyle(isDisabled ? .secondary : .primary)
                 .frame(minWidth: 52, alignment: .trailing)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
+                .help(isDisabled ? "Chosen automatically. Turn off Auto to set it yourself." : "Preamp")
             Slider(
                 value: Binding(
                     get: { trackedValue ?? value },
@@ -577,8 +579,17 @@ private final class PeakMeterNSView: NSView {
         CATransaction.setDisableActions(true)
         dotLayer.fillColor = color.cgColor
         textLayer.string = label
-        textLayer.foregroundColor = NSColor.secondaryLabelColor.cgColor
+        // A dynamic colour must be resolved in this view's appearance, or the
+        // layer gets the light-mode grey and disappears on a dark window.
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            textLayer.foregroundColor = NSColor.secondaryLabelColor.cgColor
+        }
         CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateLayers(force: true)
     }
 
     func stopAnimating() {
