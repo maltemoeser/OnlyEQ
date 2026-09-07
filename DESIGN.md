@@ -152,7 +152,7 @@ components:
 
 OnlyEQ should look like a utility Apple forgot to ship. Every colour is a system semantic colour that follows the user's accent and appearance; every typeface is San Francisco through the system text styles; every control is either a native SwiftUI control or a pixel-faithful stand-in for one. The app has no palette, no logo mark beyond an SF Symbol in an accent square, and no decoration. Brand lives in one place only: the frequency-response curve with the live spectrum breathing behind it, and the band palette that ties graph handles to their cards.
 
-The popover is one instrument, not a stack of cards. The live response fills the left pane at full height inside a hairline well, and the controls stand in one 230 point column beside it, reading top to bottom as the signal path: OnlyEQ and its switch, output device with volume, preset with its device binding and Bypass and Crossfeed, then Import, Equalizer, and the gear. Rows are separated by space, not by boxes. The whole thing sits on the system's own menu-bar material in a 560 by 272 point panel that grows only with the system text size. The editor, Settings, onboarding, and the import sheet are ordinary macOS windows: a unified toolbar, toolbar-style settings tabs, a setup assistant with a Back and Continue footer, a sheet with a segmented picker.
+The popover is one instrument, not a stack of cards. Under the name and its switch, the live response spans the full width inside a hairline well, and the controls follow beneath it, reading top to bottom as the signal path: output device with volume, preset with its device binding and Bypass and Crossfeed, then Import, Equalizer, and the gear. Rows are separated by space, not by boxes. The whole thing sits on the system's own menu-bar material in a 360 point wide panel at least 420 points tall that grows only with the system text size. The editor, Settings, onboarding, and the import sheet are ordinary macOS windows: a unified toolbar, toolbar-style settings tabs, a setup assistant with a Back and Continue footer, a sheet with a segmented picker.
 
 Motion is short, eased, and tied to a state change. A switch slides in 120 ms, bypass fades the plot in 150 ms, the band strip scrolls a selected card into view in 200 ms, and the spectrum attacks in 10 ms and releases over 400 ms. Every one of them is skipped under Reduce Motion, and that is the whole vocabulary.
 
@@ -221,13 +221,13 @@ The palette is macOS itself; the tokens above are dark-appearance snapshots of d
 
 ## Layout
 
-The popover is two panes in an `HStack` at 14 pt spacing inside 14 pt padding, 560 pt wide and at least 272 pt tall: the plot pane fills the left (288 pt at the minimum size) and the control column is fixed at 230 pt. Inside the column, rows sit 16 pt apart; each identity row is a 28 pt circled symbol, a 10 pt gap, a borderless menu, and its detail indented 38 pt underneath. The popover is sized once to its fitting size when shown, so the panel never resizes while open. It grows only with the system text size.
+The popover is one `VStack` at 14 pt spacing inside 14 pt padding, 360 pt wide and at least 420 pt tall. Top to bottom: the header (22 pt app badge, the name, the switch at the trailing edge), the plot well at a fixed 150 pt with the status pill in its top-trailing corner and the compact axis labels 4 pt beneath, the device row with the boost slider, the preset row with its binding caption and Bypass and Crossfeed, and the footer (Import, Equalizer, and the gear menu with its system indicator). Each identity row is a 28 pt circled symbol, a 10 pt gap, a borderless menu, and its detail indented 38 pt underneath. The popover is sized once to its fitting size when shown, so the panel never resizes while open. It grows only with the system text size.
 
 The editor window opens at 840 by 560 pt with a minimum of 720 by 480. Its unified 52 pt title bar carries real toolbar items (preset menu, Save, Revert on the left; Bypass in the centre; Import and the gear on the right) and hides the window title. Below it: the Compare row, a divider, the graph filling the remaining height with 24 pt side margins, a 122 pt horizontally scrolling strip of 150 pt band cards at 8 pt spacing, a divider, and the Preamp bar. Everything in the editor shares the 24 pt horizontal margin.
 
 Settings is 560 pt wide with toolbar-style tabs (General, Devices, Sound, Shortcuts, Advanced, each an SF Symbol); each page is one grouped `Form` and the window resizes to the page. Onboarding is 560 pt wide and at least 460 tall: content, a divider, and a footer with Back on the left and Continue or Start Listening on the right at the large control size with 16 pt padding. The import sheet is 560 pt wide and at least 470 tall: a segmented picker at 12 pt padding, a divider, the tab body at 16 pt padding, a divider, and Cancel and Apply at 12 pt padding.
 
-The observed spacing values are 2, 4, 6, 8, 10, 12, 14, 16, and 24 pt. Treat 4 as the unit for control internals, 8 or 10 for gaps between siblings, 14 for the popover's padding and gap, 16 for rows in a column, and 24 for a window's side margin. Labels on the graph sit 4 pt inside the plot edge. Axis labels sit at their true log-scale positions; plots under about 300 pt wide label every second octave (20 Hz, 125, 500, 2 kHz, 8 kHz).
+The observed spacing values are 2, 4, 6, 8, 10, 12, 14, 16, and 24 pt. Treat 4 as the unit for control internals, 8 or 10 for gaps between siblings, 14 for the popover's padding and the gap between its rows, 16 for window footers, and 24 for a window's side margin. Labels on the graph sit 4 pt inside the plot edge. Axis labels sit at their true log-scale positions; plots under about 300 pt wide label every second octave (20 Hz, 125, 500, 2 kHz, 8 kHz).
 
 ## Elevation & Depth
 
@@ -236,7 +236,7 @@ Flat, by macOS convention. The popover panel has the system shadow and the syste
 ### Named Rules
 **The System Casts The Shadow Rule.** Only windows, popovers, sheets, and control knobs have shadows, and only the ones AppKit would draw. Do not add shadows to cards, nodes, or hover states.
 
-**The One Surface Rule.** No cards: rows are separated by space; the plot alone sits in a hairline well, the one surface the app draws, and every plot in the app sits in the same one. The well is `Color.primary` at 3.5 % with a 1 pt 8 % hairline and 10 pt continuous corners. The popover plot, the onboarding sample curve, and the import drop well share it. The editor graph fills its window edge to edge instead, and the small preview curves inside the import sheet sit bare; do not add a second surface style to bring them in line.
+**The One Surface Rule.** No cards: rows are separated by space; the plot alone sits in a hairline well, the one surface the app draws. Every plot outside the editor's canvas sits in the same one. The well is the `plotWell()` modifier: `Color.primary` at 3.5 % with a 1 pt 8 % hairline and 10 pt continuous corners. The popover plot, the onboarding sample curve, both preview curves in the import sheet, and the import drop well share it. The editor graph is the only exception; it fills its window edge to edge.
 
 ## Shapes
 
@@ -245,9 +245,9 @@ Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot
 ## Components
 
 ### Plot Well (signature surface)
-- **Shape:** continuous 10 pt radius, clipped.
+- **Shape:** continuous 10 pt radius, clipped; applied with the `plotWell()` modifier.
 - **Fill:** `Color.primary` 3.5 % with a 1 pt 8 % hairline.
-- **Contents:** the curve, its axis labels 4 pt below at caption2 secondary, and any notice in the corner.
+- **Contents:** the curve, its axis labels 4 pt below at caption2 secondary, and any notice in the corner. Heights: 150 pt in the popover and onboarding, 110 and 80 pt for the import previews.
 - **Drop variant:** the import drop well uses the same shape; while a file hovers it switches to accent 8 % fill with a solid accent stroke, and the document symbol turns accent.
 
 ### Switch (`AccentSwitchStyle`)
@@ -257,10 +257,10 @@ Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot
 - Native SwiftUI `.bordered` and `.borderedProminent`. Popover buttons are `.small`; onboarding footers are `.large`; toolbar items and sheet footers are the default size. Toggles that behave like buttons (Bypass, Crossfeed) use `.button` toggle style. A Compare slot is a bordered button tinted accent when selected. There is no custom button.
 
 ### Identity Row (`IdentityRow`)
-- A 28 pt circle at primary 7 % holding a callout-weight secondary SF Symbol, a 10 pt gap, a borderless-button menu with a body-medium label truncated in the middle, and a detail block indented 38 pt. The device row's detail is the boost slider; the preset row's is the binding caption plus Bypass and Crossfeed.
+- A 28 pt circle at primary 7 % holding a callout-weight secondary SF Symbol, a 10 pt gap, a borderless-button menu with a body-medium label truncated in the middle, and a detail block indented 38 pt. Full width of the popover. The device row's detail is the boost slider; the preset row's is the binding caption plus Bypass and Crossfeed.
 
 ### Status Pill
-- A capsule of `.background` at 60 % with 7 by 3 pt padding, a 6 pt dot (green active, secondary off or bypassed, orange waiting, red error), and caption2 medium secondary text with monospaced digits. Sits 8 pt inside the top-right of the popover plot.
+- A capsule of `.background` at 60 % with 7 by 3 pt padding, a 6 pt dot (green active, secondary off or bypassed, orange waiting, red error), and caption2 medium secondary text with monospaced digits. Sits 8 pt inside the top-trailing corner of the popover plot.
 
 ### Value Field (`EditableValueField`)
 - A 4 pt radius quaternary 50 % fill, caption text with monospaced digits right-aligned, 2 by 4 pt padding. Resting state is a button; click to edit, Enter commits, Escape cancels, values clamp to the canvas range.
@@ -284,7 +284,7 @@ Continuous (squircle) corners at 14 pt for the popover panel, 10 pt for the plot
 
 ### Do:
 - **Do** use `Color.accentColor`, `.primary`, `.secondary`, `.tertiary`, `.quaternary`, and `NSColor` semantic colours; that is how the app follows the user's accent and appearance.
-- **Do** put a standalone plot in the plot well and nothing else in a well of its own.
+- **Do** put every plot outside the editor's canvas in the plot well, and nothing else in a well of its own.
 - **Do** set every live number in monospaced digits and every run of text in a system text style.
 - **Do** keep new controls native: bordered buttons, native menus, real toolbar items, grouped forms in Settings, a setup-assistant footer in onboarding.
 - **Do** tie any animation to a state change, keep it under 200 ms with an ease curve, and skip it under Reduce Motion.
