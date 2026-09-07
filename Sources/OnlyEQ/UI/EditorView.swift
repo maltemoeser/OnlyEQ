@@ -236,6 +236,9 @@ struct EditorView: View {
                 if state.bypassed {
                     Label("Bypassed", systemImage: "eye.slash")
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
+                } else if bandLimitReached {
+                    Label("32 bands maximum", systemImage: "plus.circle")
+                        .font(.caption).foregroundStyle(.tertiary).padding(4)
                 } else {
                     Label("Double-click graph to add band", systemImage: "plus.circle")
                         .font(.caption).foregroundStyle(.tertiary).padding(4)
@@ -306,7 +309,8 @@ struct EditorView: View {
                 .frame(width: 44, height: 100)
         }
         .buttonStyle(.plain)
-        .help("Add band")
+        .disabled(bandLimitReached)
+        .help(bandLimitReached ? "32 bands maximum" : "Add band")
         .accessibilityLabel("Add band")
         .background(
             RoundedRectangle(cornerRadius: 8)
@@ -325,8 +329,10 @@ struct EditorView: View {
         )
     }
 
+    private var bandLimitReached: Bool { state.preset.bands.count >= 32 }
+
     private func addBand(_ band: EQBand) {
-        guard state.preset.bands.count < 32 else { return }
+        guard !bandLimitReached else { return }
         state.recordingUndo("Add Band", undoManager) { state.preset.bands.append(band) }
         selectedBandID = band.id
     }
