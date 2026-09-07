@@ -12,14 +12,17 @@ import SwiftUI
 //   rows are separated by space; the plot alone sits in a hairline well, the
 //   one surface the app draws. Every plot outside the editor's canvas sits in
 //   the same one.
-// STORY: Open, watch the curve under the music, see which device and preset
-//   are live, flip Bypass to hear it flat, close. Editing happens elsewhere.
-// FIRST VIEWPORT: 360 pt wide, about 400 tall. OnlyEQ and its switch; the
-//   plot, 150 pt, with its axis and a status pill in the corner; Bypass and
-//   Crossfeed as small toggles under the axis; output device with
-//   volume; preset with its "use automatically" checkbox; a hairline, then
-//   Open Equalizer… and the gear. The plot is the only bordered surface and
-//   the toggles the only bordered controls: everything else is text.
+// STORY: Open, watch the music move under the curve, see which preset and
+//   device are live, flip Bypass to hear it flat, close. Editing happens
+//   elsewhere.
+// FIRST VIEWPORT: 360 pt wide, about 400 tall. OnlyEQ, its latency in
+//   small type, and its switch; the plot, 150 pt, with the live spectrum
+//   leading and the curve a line over it, a vertical volume fader at its
+//   side, and a pill in the corner only when something is off (bypassed,
+//   waiting, error); Bypass and Crossfeed as small capsule toggles under the
+//   axis; the preset with its "use automatically" checkbox; the output
+//   device in regular weight beneath it; a hairline, then a bordered Open
+//   Equalizer… and the gear.
 // FORM: curve-first stack, candidate 2 of the grounded list, chosen by the
 //   user over the rolled candidate 7 (key 1512465f).
 // FINISH: unreviewed and undocumented is unfinished; this build ends with
@@ -47,10 +50,10 @@ struct PopoverView: View {
             Group {
                 listeningRow
                     .padding(.top, 8)
-                deviceRow
-                    .padding(.top, 20)
                 presetRow
-                    .padding(.top, 16)
+                    .padding(.top, 18)
+                deviceRow
+                    .padding(.top, 12)
             }
             .disabled(!state.isEnabled)
             .opacity(state.isEnabled ? 1 : 0.45)
@@ -72,27 +75,47 @@ struct PopoverView: View {
     // MARK: - Curve pane
 
     private var curvePane: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .topTrailing) {
-                if state.suspectedPermissionIssue {
-                    permissionNotice
-                } else {
-                    curveButton
-                    statusIndicator
-                        .padding(8)
+        HStack(alignment: .top, spacing: 10) {
+            VStack(spacing: 4) {
+                ZStack(alignment: .topTrailing) {
+                    if state.suspectedPermissionIssue {
+                        permissionNotice
+                    } else {
+                        curveButton
+                        if let status = exceptionalStatus {
+                            statusPill(status)
+                                .padding(8)
+                        }
+                    }
+                    if let suggestion = state.pendingProfileSuggestion,
+                       suggestion.deviceUID == state.currentDevice?.uid {
+                        suggestionNotice(suggestion)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                            .padding(8)
+                    }
                 }
-                if let suggestion = state.pendingProfileSuggestion,
-                   suggestion.deviceUID == state.currentDevice?.uid {
-                    suggestionNotice(suggestion)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .padding(8)
-                }
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.plotHeight)
+                .plotWell()
+                FrequencyAxisLabels(compact: true)
+                    .padding(.horizontal, 1)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: Self.plotHeight)
-            .plotWell()
-            FrequencyAxisLabels(compact: true)
-                .padding(.horizontal, 1)
+            // Volume as a fader beside the plot, the readout on the well's
+            // top line and the speaker on the axis line.
+            BoostSlider(
+                value: $state.userVolumePercent,
+                maxPercent: state.maxBoostPercent,
+                onPreview: { state.previewVolumeAdjustment($0) },
+                onEditingChanged: { editing in
+                    if editing {
+                        state.beginVolumeAdjustment()
+                    } else {
+                        state.endVolumeAdjustment()
+                    }
+                }
+            )
+            .frame(height: Self.plotHeight + 16)
+            .disabled(!state.isEnabled)
         }
         .opacity(state.isEnabled ? 1 : 0.45)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.isEnabled)
@@ -102,11 +125,13 @@ struct PopoverView: View {
         Button {
             WindowManager.shared.showEditor()
         } label: {
-            // Bypass settles the curve onto 0 dB rather than blanking it:
-            // the one authored moment, and it says what bypass does.
+            // The spectrum leads and the curve is a line over it. Bypass
+            // settles the line onto 0 dB rather than blanking it: the one
+            // authored moment, and it says what bypass does.
             EQCurveView(bands: state.preset.bands, preampDB: 0,
                         showSpectrum: state.isEnabled && state.popoverIsVisible,
-                        spectrumStyle: .normal, rangeDB: state.preset.displayRangeDB,
+                        spectrumStyle: .live, curveStyle: .line,
+                        rangeDB: state.preset.displayRangeDB,
                         responseScale: state.bypassed ? 0 : 1)
                 .padding(.vertical, 1)
                 .opacity(state.bypassed ? 0.55 : 1)
@@ -119,14 +144,26 @@ struct PopoverView: View {
         .accessibilityHint("Opens the equalizer")
     }
 
-    private var statusIndicator: some View {
+    /// The pill names only what the switch cannot: bypassed, waiting for
+    /// audio, or failed. Plain running is the switch being on.
+    private var exceptionalStatus: (text: String, color: Color)? {
+        guard state.isEnabled else { return nil }
+        switch state.engineState {
+        case .running:
+            if state.suspectedPermissionIssue { return ("Waiting for audio", .orange) }
+            return state.bypassed ? ("Bypassed", .secondary) : nil
+        case .stopped: return nil
+        case .failed: return ("Error", .red)
+        }
+    }
+
+    private func statusPill(_ status: (text: String, color: Color)) -> some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(statusColor)
+                .fill(status.color)
                 .frame(width: 6, height: 6)
-            Text(statusText)
+            Text(status.text)
                 .font(.caption2.weight(.medium))
-                .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 7)
@@ -134,30 +171,14 @@ struct PopoverView: View {
         .background(Capsule().fill(.background.opacity(0.6)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Status")
-        .accessibilityValue(statusText)
+        .accessibilityValue(status.text)
     }
 
-    private var statusColor: Color {
-        guard state.isEnabled else { return .secondary }
-        switch state.engineState {
-        case .running:
-            if state.suspectedPermissionIssue { return .orange }
-            return state.bypassed ? .secondary : .green
-        case .stopped: return .secondary
-        case .failed: return .red
-        }
-    }
-
-    private var statusText: String {
-        guard state.isEnabled else { return "Off" }
-        switch state.engineState {
-        case .running:
-            if state.suspectedPermissionIssue { return "Waiting for audio" }
-            if state.bypassed { return "Bypassed" }
-            return showLatency ? "Active · \(state.latencyMilliseconds) ms" : "Active"
-        case .stopped: return "Off"
-        case .failed: return "Error"
-        }
+    /// Processing latency, a detail beside the name while the EQ runs.
+    private var latencyDetail: String? {
+        guard showLatency, state.isEnabled, !state.suspectedPermissionIssue,
+              case .running = state.engineState else { return nil }
+        return "\(state.latencyMilliseconds) ms"
     }
 
     /// Replaces the old behaviour of opening the equalizer with an import
@@ -218,6 +239,14 @@ struct PopoverView: View {
         HStack(spacing: 8) {
             AppBadge()
             Text("OnlyEQ").font(.body.weight(.semibold))
+            if let latency = latencyDetail {
+                Text(latency)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .help("Latency the EQ adds to the output")
+                    .accessibilityLabel("Latency \(latency)")
+            }
             Spacer()
             Toggle("", isOn: $state.isEnabled)
                 .toggleStyle(AccentSwitchStyle())
@@ -226,46 +255,7 @@ struct PopoverView: View {
         }
     }
 
-    private var deviceRow: some View {
-        IdentityRow(symbol: state.currentDevice?.icon ?? "speaker.slash", symbolLabel: "Output device") {
-            Menu {
-                ForEach(state.devices) { device in
-                    Button {
-                        state.selectOutputDevice(device)
-                    } label: {
-                        if device.id == state.currentDevice?.id {
-                            Label(device.name, systemImage: "checkmark")
-                        } else {
-                            Text(device.name)
-                        }
-                    }
-                }
-            } label: {
-                menuLabel(state.currentDevice?.name ?? "No Output Device")
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize(horizontal: false, vertical: true)
-            .help("Output device")
-            Spacer(minLength: 6)
-            // Volume mostly comes from the keyboard, so the slider is a
-            // small trailing control, not a second line.
-            BoostSlider(
-                value: $state.userVolumePercent,
-                maxPercent: state.maxBoostPercent,
-                onPreview: { state.previewVolumeAdjustment($0) },
-                onEditingChanged: { editing in
-                    if editing {
-                        state.beginVolumeAdjustment()
-                    } else {
-                        state.endVolumeAdjustment()
-                    }
-                }
-            )
-        } detail: {
-            EmptyView()
-        }
-    }
-
+    /// The preset leads: it is what this app adds. Its binding sits under it.
     private var presetRow: some View {
         IdentityRow(symbol: "slider.horizontal.3", symbolLabel: "Preset") {
             Menu {
@@ -282,7 +272,7 @@ struct PopoverView: View {
                     }
                 }
             } label: {
-                menuLabel(state.preset.name)
+                menuLabel(state.preset.name, weight: .semibold)
             }
             .menuStyle(.borderlessButton)
             .fixedSize(horizontal: false, vertical: true)
@@ -316,59 +306,94 @@ struct PopoverView: View {
         )
     }
 
-    /// The listening switches sit under the curve: Bypass empties the
-    /// plot when pressed, so the control and its feedback stay together.
+    /// The output device follows in regular weight: where the sound goes,
+    /// not what the app does to it.
+    private var deviceRow: some View {
+        IdentityRow(symbol: state.currentDevice?.icon ?? "speaker.slash", symbolLabel: "Output device") {
+            Menu {
+                ForEach(state.devices) { device in
+                    Button {
+                        state.selectOutputDevice(device)
+                    } label: {
+                        if device.id == state.currentDevice?.id {
+                            Label(device.name, systemImage: "checkmark")
+                        } else {
+                            Text(device.name)
+                        }
+                    }
+                }
+            } label: {
+                menuLabel(state.currentDevice?.name ?? "No Output Device", weight: .regular)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+            .help("Output device")
+        } detail: {
+            EmptyView()
+        }
+    }
+
+    /// The listening switches sit under the curve as capsules, kin to the
+    /// status pill: Bypass settles the curve when pressed, so the control
+    /// and its feedback stay together.
     private var listeningRow: some View {
         HStack(spacing: 6) {
-            Toggle("Bypass", isOn: $state.bypassed)
-                .help("Hear the unprocessed signal without changing the preset")
-            Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
-                .help("Blend a little of each channel into the other for headphones")
+            Toggle(isOn: $state.bypassed) {
+                Label("Bypass", systemImage: "waveform.slash")
+            }
+            .help("Hear the unprocessed signal without changing the preset")
+            Toggle(isOn: $state.crossfeedEnabled) {
+                Label("Crossfeed", systemImage: "arrow.left.arrow.right")
+            }
+            .help("Blend a little of each channel into the other for headphones")
         }
         .toggleStyle(.button)
         .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
         .controlSize(.small)
     }
 
-    private func menuLabel(_ name: String) -> some View {
+    private func menuLabel(_ name: String, weight: Font.Weight) -> some View {
         Text(name)
-            .font(.body.weight(.medium))
+            .font(.body.weight(weight))
             .lineLimit(1)
             .truncationMode(.middle)
     }
 
     // MARK: - Footer
 
-    /// A hairline and a plain text button, the way Control Center modules
-    /// end in "Sound Settings…".
+    /// A hairline, then the way into the editor as a real button: the other
+    /// half of the app.
     private var footer: some View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 6) {
-                Button("Open Equalizer…") {
+                Button {
                     WindowManager.shared.showEditor()
+                } label: {
+                    Label("Open Equalizer…", systemImage: "slider.horizontal.3")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.primary)
+                .buttonStyle(.bordered)
                 Spacer(minLength: 0)
                 AppGearMenu()
                     .menuStyle(.borderlessButton)
                     .fixedSize()
             }
-            .padding(.top, 8)
+            .padding(.top, 10)
         }
     }
 }
 
-/// Volume slider: accent track to 100 %, orange boost zone beyond, tick at
-/// 100 %; the readout turns orange in the boost zone.
+/// Vertical volume fader beside the plot: accent to 100 %, orange boost zone
+/// above it, a tick at 100 %. The readout sits on top and turns orange in
+/// the boost zone; the speaker sits below on the axis line.
 struct BoostSlider: View {
     @Binding var value: Double
     var maxPercent: Double
     var onPreview: (Double) -> Void = { _ in }
     var onEditingChanged: (_ editing: Bool) -> Void = { _ in }
+    static let width: CGFloat = 30
     private let knobDiameter: CGFloat = 13
-    private let trackWidth: CGFloat = 84
     @State private var trackedValue: Double?
     @State private var lastPreviewTime: TimeInterval = 0
     @State private var previewInterval: TimeInterval = 1.0 / 60.0
@@ -376,55 +401,46 @@ struct BoostSlider: View {
 
     var body: some View {
         let displayedValue = trackedValue ?? value
-        HStack(spacing: 5) {
-            // The number appears while the value is changing, and stays
-            // while the output is boosted past 100 %.
-            if trackedValue != nil || displayedValue > 100 {
-                Text("\(Int(displayedValue.rounded()))%")
-                    .font(.caption2.weight(.medium))
-                    .monospacedDigit()
-                    .foregroundStyle(displayedValue > 100 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                    .frame(width: 28, alignment: .trailing)
-                    .accessibilityHidden(true)
-            }
-            Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .frame(width: 13)
-                .accessibilityHidden(true)
+        let percent = Int(displayedValue.rounded())
+        VStack(spacing: 4) {
+            Text("\(percent)%")
+                .font(.caption2.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(displayedValue > 100 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .frame(height: 12)
             GeometryReader { geo in
-                let width = geo.size.width
+                let height = geo.size.height
                 let fraction = min(max(displayedValue / maxPercent, 0), 1)
                 let hundred = min(100 / maxPercent, 1)
-                let knobX = sliderPosition(for: fraction, width: width)
-                let hundredX = sliderPosition(for: hundred, width: width)
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.12)).frame(height: 4)
+                let knobY = faderPosition(for: fraction, height: height)
+                let hundredY = faderPosition(for: hundred, height: height)
+                ZStack(alignment: .bottom) {
+                    Capsule().fill(Color.primary.opacity(0.12)).frame(width: 4)
                     Capsule().fill(Color.accentColor)
-                        .frame(width: displayedValue > 0 ? min(knobX, hundredX) : 0, height: 4)
+                        .frame(width: 4, height: displayedValue > 0 ? min(knobY, hundredY) : 0)
                     if displayedValue > 100 {
                         Rectangle().fill(.orange)
-                            .frame(width: max(knobX - hundredX, 0), height: 4)
-                            .offset(x: hundredX)
+                            .frame(width: 4, height: max(knobY - hundredY, 0))
+                            .offset(y: -hundredY)
                     }
                     // 100 % tick.
                     if maxPercent > 100 {
                         RoundedRectangle(cornerRadius: 1)
                             .fill(Color.primary.opacity(0.35))
-                            .frame(width: 2, height: 8)
-                            .offset(x: hundredX - 1)
+                            .frame(width: 8, height: 2)
+                            .offset(y: -(hundredY - 1))
                     }
                     Circle()
                         .fill(.white)
                         .frame(width: knobDiameter, height: knobDiameter)
                         .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
-                        .offset(x: knobX - knobDiameter / 2)
+                        .offset(y: -(knobY - knobDiameter / 2))
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
-                        let updated = sliderValue(at: gesture.location.x, width: width)
+                        let updated = faderValue(at: gesture.location.y, height: height)
                         beginTrackingIfNeeded(at: updated)
                         trackedValue = updated
                         let now = ProcessInfo.processInfo.systemUptime
@@ -437,7 +453,7 @@ struct BoostSlider: View {
                         }
                     }
                     .onEnded { gesture in
-                        let updated = sliderValue(at: gesture.location.x, width: width)
+                        let updated = faderValue(at: gesture.location.y, height: height)
                         finishTracking(at: updated)
                     })
                 .overlay {
@@ -446,24 +462,30 @@ struct BoostSlider: View {
                     }
                 }
             }
-            .frame(width: trackWidth, height: 16)
+            Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(height: 12)
         }
+        .frame(width: Self.width)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Output volume")
-        .accessibilityValue("\(Int(displayedValue.rounded())) percent")
-        .help("Output volume, \(Int(displayedValue.rounded())) %")
+        .accessibilityValue("\(percent) percent")
+        .help("Output volume, \(percent) %")
         .onDisappear {
             if let trackedValue { finishTracking(at: trackedValue) }
         }
     }
 
-    private func sliderValue(at x: CGFloat, width: CGFloat) -> Double {
-        guard width > knobDiameter else { return value }
-        return min(max(Double((x - knobDiameter / 2) / (width - knobDiameter)) * maxPercent, 0), maxPercent)
+    /// Bottom of the track is 0, the top is the maximum.
+    private func faderValue(at y: CGFloat, height: CGFloat) -> Double {
+        guard height > knobDiameter else { return value }
+        let fromBottom = height - y
+        return min(max(Double((fromBottom - knobDiameter / 2) / (height - knobDiameter)) * maxPercent, 0), maxPercent)
     }
 
-    private func sliderPosition(for fraction: Double, width: CGFloat) -> CGFloat {
-        knobDiameter / 2 + CGFloat(fraction) * max(width - knobDiameter, 0)
+    private func faderPosition(for fraction: Double, height: CGFloat) -> CGFloat {
+        knobDiameter / 2 + CGFloat(fraction) * max(height - knobDiameter, 0)
     }
 
     private func beginTrackingIfNeeded(at currentValue: Double) {

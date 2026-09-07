@@ -77,9 +77,31 @@ private final class EQCurveResponseCache: ObservableObject {
 struct EQCurveView: View, Animatable {
     enum SpectrumStyle {
         case normal, subtle
+        /// The popover: the moving spectrum leads and the curve is a line
+        /// over it.
+        case live
 
-        var opacity: Double { self == .subtle ? 0.08 : 0.10 }
-        var heightScale: Double { self == .subtle ? 0.6 : 0.75 }
+        var opacity: Double {
+            switch self {
+            case .subtle: 0.08
+            case .normal: 0.10
+            case .live: 0.22
+            }
+        }
+        var heightScale: Double {
+            switch self {
+            case .subtle: 0.6
+            case .normal: 0.75
+            case .live: 0.85
+            }
+        }
+    }
+
+    enum CurveStyle {
+        /// Stroke over a gradient fill: the editor and previews.
+        case filled
+        /// A thinner stroke and no fill, so what moves behind it shows.
+        case line
     }
 
     var bands: [EQBand]
@@ -87,6 +109,7 @@ struct EQCurveView: View, Animatable {
     var interactive = false
     var showSpectrum = true
     var spectrumStyle: SpectrumStyle = .normal
+    var curveStyle: CurveStyle = .filled
     var showIndividualCurves = false
     var rangeDB: Double = 12
     /// 1 draws the response, 0 draws it flat; animated across a bypass so
@@ -106,7 +129,7 @@ struct EQCurveView: View, Animatable {
     }
 
     init(bands: [EQBand], preampDB: Double, interactive: Bool = false, showSpectrum: Bool = true,
-         spectrumStyle: SpectrumStyle = .normal,
+         spectrumStyle: SpectrumStyle = .normal, curveStyle: CurveStyle = .filled,
          showIndividualCurves: Bool = false, rangeDB: Double = 12, responseScale: Double = 1,
          selectedBandID: Binding<UUID?> = .constant(nil),
          onBandChange: ((UUID, Double, Double) -> Void)? = nil,
@@ -117,6 +140,7 @@ struct EQCurveView: View, Animatable {
         self.interactive = interactive
         self.showSpectrum = showSpectrum
         self.spectrumStyle = spectrumStyle
+        self.curveStyle = curveStyle
         self.showIndividualCurves = showIndividualCurves
         self.rangeDB = rangeDB
         self.responseScale = responseScale
@@ -209,20 +233,24 @@ struct EQCurveView: View, Animatable {
             let points = curvePoints(size: size, data: data)
             guard points.count > 1 else { return }
 
-            var fill = Path()
-            fill.move(to: CGPoint(x: points[0].x, y: size.height))
-            for p in points { fill.addLine(to: p) }
-            fill.addLine(to: CGPoint(x: points[points.count - 1].x, y: size.height))
-            fill.closeSubpath()
-            ctx.fill(fill, with: .linearGradient(
-                Gradient(colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.03)]),
-                startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)
-            ))
+            if curveStyle == .filled {
+                var fill = Path()
+                fill.move(to: CGPoint(x: points[0].x, y: size.height))
+                for p in points { fill.addLine(to: p) }
+                fill.addLine(to: CGPoint(x: points[points.count - 1].x, y: size.height))
+                fill.closeSubpath()
+                ctx.fill(fill, with: .linearGradient(
+                    Gradient(colors: [Color.accentColor.opacity(0.35), Color.accentColor.opacity(0.03)]),
+                    startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)
+                ))
+            }
 
             var stroke = Path()
             stroke.move(to: points[0])
             for p in points.dropFirst() { stroke.addLine(to: p) }
-            ctx.stroke(stroke, with: .color(.accentColor), style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+            let lineWidth: CGFloat = curveStyle == .filled ? 2 : 1.5
+            ctx.stroke(stroke, with: .color(.accentColor.opacity(curveStyle == .filled ? 1 : 0.9)),
+                       style: StrokeStyle(lineWidth: lineWidth, lineJoin: .round))
         }
     }
 
