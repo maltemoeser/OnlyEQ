@@ -632,14 +632,14 @@ enum TestRunner {
             let a = EQPreset(name: "A", bands: [EQBand(type: .peak, frequency: 1000, gain: 3, q: 1)])
             state.apply(a)
             if state.abSlot != 0 { state.storeABAndSwitch(to: 0) }
-            expect(!state.otherABSlotIsFilled || state.abSlot == 0, "test starts in slot A")
+            expect(state.abSlot == 0, "test starts in slot A")
 
             undo.beginUndoGrouping()
             state.storeABAndSwitch(to: 1, undoManager: undo)
             undo.endUndoGrouping()
             expect(state.abSlot == 1, "switching selects slot B")
             expect(state.preset == a, "an empty B starts as a copy of A")
-            expect(state.otherABSlotIsFilled, "A holds the curve that was left")
+            expect(state.abPreset(inSlot: 0) == a, "A holds the curve that was left")
             expect(undo.undoActionName == "Switch A/B", "the switch is an undo step")
 
             state.preset.bands[0].gain = -4
@@ -657,6 +657,20 @@ enum TestRunner {
             undo.removeAllActions()
             state.storeABAndSwitch(to: 0, undoManager: undo)
             expect(!undo.canUndo, "switching to the active slot registers nothing")
+
+            // Choosing a preset for a slot fills it and switches to it.
+            let c = EQPreset(name: "C", bands: [EQBand(type: .peak, frequency: 500, gain: 2, q: 1)])
+            undo.beginUndoGrouping()
+            state.compare(with: c, inSlot: 1, undoManager: undo)
+            undo.endUndoGrouping()
+            expect(state.abSlot == 1 && state.preset == c, "choosing a preset for B selects B holding it")
+            expect(state.abPreset(inSlot: 0) == a, "A keeps its curve as the reference")
+            expect(undo.undoActionName == "Compare with C", "the choice is one named undo step")
+            undo.undo()
+            expect(state.abSlot == 0 && state.preset == a && state.abPreset(inSlot: 1) == b,
+                   "undo restores the slot that was replaced")
+            state.preset.bands[0].gain = 9
+            expect(state.abSlotIsModified(0) == false, "an unsaved working preset is not marked edited")
         }
     }
 

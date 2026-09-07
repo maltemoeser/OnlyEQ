@@ -35,6 +35,7 @@ struct EditorView: View {
                 SettingsView()
             } else {
                 toolbar
+                compareRow
                 Divider()
                 graph
                 bandStrip
@@ -61,22 +62,79 @@ struct EditorView: View {
         }
     }
 
-    // MARK: - A/B
+    // MARK: - Compare (A/B)
 
-    private func abSlotIsFilled(_ slot: Int) -> Bool {
-        slot == state.abSlot || state.otherABSlotIsFilled
+    /// Two slots. The selected one is the working copy: what you hear and
+    /// edit. The other waits unchanged as the reference. Each pill names the
+    /// curve it holds, so nothing about the mechanism has to be guessed.
+    private var compareRow: some View {
+        HStack(spacing: 8) {
+            Text("Compare")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            slotPill(0)
+            slotPill(1)
+            Spacer()
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 8)
+        .help("Two slots. The selected one is what you hear and edit; the other waits unchanged. Switching is level-matched.")
     }
 
-    private var abStatus: String {
-        let other = state.abSlot == 0 ? "B" : "A"
-        return state.otherABSlotIsFilled ? "\(other) holds a curve" : "\(other) is empty"
+    @ViewBuilder
+    private func slotPill(_ slot: Int) -> some View {
+        let letter = slot == 0 ? "A" : "B"
+        let isSelected = state.abSlot == slot
+        if let held = state.abPreset(inSlot: slot) {
+            let name = held.name + (state.abSlotIsModified(slot) ? " (edited)" : "")
+            Button {
+                state.storeABAndSwitch(to: slot, undoManager: undoManager)
+            } label: {
+                slotLabel(letter, name: name, isSelected: isSelected)
+            }
+            .buttonStyle(.bordered)
+            .tint(isSelected ? Color.accentColor : nil)
+            .help(isSelected
+                  ? "\(letter): \(name). Selected: this is what you hear and edit."
+                  : "\(letter): \(name). Waiting unchanged. Click to switch, level-matched.")
+            .accessibilityLabel("Slot \(letter), \(name)")
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        } else {
+            Menu {
+                ForEach(state.store.allPresets) { preset in
+                    Button(preset.name) {
+                        state.compare(with: preset, inSlot: slot, undoManager: undoManager)
+                    }
+                }
+                Divider()
+                Button("Import…") {
+                    state.storeABAndSwitch(to: slot, undoManager: undoManager)
+                    importPresentation = ImportPresentation(profileSuggestion: nil)
+                }
+            } label: {
+                // A macOS Menu label keeps only one Text, so this one is concatenated.
+                (Text(Image(systemName: "circle")).foregroundColor(.secondary)
+                    + Text("  \(letter)  ").fontWeight(.semibold)
+                    + Text("Choose…"))
+                    .font(.caption)
+            }
+            .fixedSize()
+            .help("Pick a preset or import one to compare against \(slot == 0 ? "B" : "A"). Nothing is saved until you press Save.")
+            .accessibilityLabel("Slot \(letter), empty. Choose a preset to compare")
+        }
     }
 
-    private var abHelp: String {
-        let other = state.abSlot == 0 ? "B" : "A"
-        return state.otherABSlotIsFilled
-            ? "Compare two versions. Switching stores the current curve in the slot you leave."
-            : "Compare two versions. \(other) is empty; switching copies the current curve into it."
+    private func slotLabel(_ letter: String, name: String, isSelected: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                .font(.caption2)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            Text(letter).font(.caption.weight(.semibold))
+            Text(name).font(.caption).lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: 200)
+        }
+        .fixedSize()
     }
 
     // MARK: - Toolbar
@@ -114,34 +172,6 @@ struct EditorView: View {
                 .help("Discard edits and return to the saved preset")
 
             Spacer()
-
-            Picker("A/B", selection: Binding(
-                get: { state.abSlot },
-                set: { state.storeABAndSwitch(to: $0, undoManager: undoManager) }
-            )) {
-                Text("A").tag(0)
-                Text("B").tag(1)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            // A dot under each slot that holds a curve, so an empty slot is
-            // visible before the first switch copies into it.
-            .overlay(alignment: .bottom) {
-                HStack(spacing: 0) {
-                    ForEach(0..<2, id: \.self) { slot in
-                        Circle()
-                            .fill(abSlotIsFilled(slot) ? Color.secondary : .clear)
-                            .frame(width: 3, height: 3)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 2)
-                .allowsHitTesting(false)
-            }
-            .accessibilityValue(abStatus)
-            .help(abHelp)
 
             Toggle("Bypass", isOn: $state.bypassed)
                 .toggleStyle(.button)
