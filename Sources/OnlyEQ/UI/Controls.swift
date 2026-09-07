@@ -48,12 +48,16 @@ struct PanelMaterial: NSViewRepresentable {
     var cornerRadius: CGFloat
 
     func makeNSView(context: Context) -> NSView {
+        // NSGlassEffectView exists only in the macOS 26 SDK (Swift 6.2 and
+        // later); an older toolchain builds the vibrancy fallback everywhere.
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()
             glass.cornerRadius = cornerRadius
             glass.style = .regular
             return glass
         }
+        #endif
         let effect = NSVisualEffectView()
         effect.material = .popover
         effect.blendingMode = .behindWindow
