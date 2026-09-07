@@ -320,7 +320,9 @@ struct PopoverView: View {
     private var statusColor: Color {
         guard state.isEnabled else { return .secondary }
         switch state.engineState {
-        case .running: return state.suspectedPermissionIssue ? .orange : .green
+        case .running:
+            if state.suspectedPermissionIssue { return .orange }
+            return state.bypassed ? .secondary : .green
         case .stopped: return .secondary
         case .failed: return .red
         }
