@@ -507,7 +507,7 @@ struct FrequencyAxisLabels: View {
         GeometryReader { geo in
             ForEach(items, id: \.label) { item in
                 Text(item.label)
-                    .font(.system(size: 9))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .position(x: labelX(for: item.freq, width: geo.size.width), y: geo.size.height / 2)
             }

@@ -71,7 +71,7 @@ OnlyEQ checks for signed updates automatically and installs them in the backgrou
 - Loudness compensation: raises bass and treble as you turn the volume down below a reference level you set, following the equal-loudness contours, so quiet listening keeps its balance.
 - Crossfeed for headphones: blends a little low-passed, delayed signal from each channel into the other, so hard-panned recordings sound less split. Toggle it from the popover; the amount is in Settings.
 - An exclude list for apps that handle their own audio (DAWs, Zoom).
-- Global hotkeys for toggling EQ and cycling output devices. Launch at login. That's it — one popover, one editor window, one settings window.
+- Global hotkeys for toggling EQ and cycling output devices. Launch at login. Text follows the system text size and every control has a VoiceOver name. That's it — one popover, one editor window, one settings window.
 - Signed automatic updates powered by [Sparkle](https://sparkle-project.org/).
 
 <p align="center">

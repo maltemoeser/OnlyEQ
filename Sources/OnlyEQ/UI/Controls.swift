@@ -3,6 +3,10 @@ import SwiftUI
 /// macOS-switch lookalike drawn in pure SwiftUI. AppKit's NSSwitch doesn't
 /// render its state when drawn into an offscreen window (which breaks the
 /// --screenshots mode), and this also guarantees an identical look everywhere.
+///
+/// The capsule takes keyboard focus, toggles on Space, and presents itself to
+/// VoiceOver as the Toggle it stands in for, so it behaves like the real
+/// control and not like a picture of one.
 struct AccentSwitchStyle: ToggleStyle {
     var width: CGFloat = 34
 
@@ -20,7 +24,16 @@ struct AccentSwitchStyle: ToggleStyle {
                         .padding(1.5)
                 }
                 .animation(.easeOut(duration: 0.12), value: configuration.isOn)
+                .contentShape(Capsule())
                 .onTapGesture { configuration.isOn.toggle() }
+                .focusable()
+                .onKeyPress(.space) {
+                    configuration.isOn.toggle()
+                    return .handled
+                }
+        }
+        .accessibilityRepresentation {
+            Toggle(isOn: configuration.$isOn) { configuration.label }
         }
     }
 }

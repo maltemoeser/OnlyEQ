@@ -46,7 +46,8 @@ struct PopoverView: View {
         // Keep the host size stable when the permission banner replaces the
         // curve. AppDelegate can then size the popover once instead of asking
         // SwiftUI to propagate preferred-size changes on every spectrum frame.
-        .frame(width: 360, height: 410, alignment: .top)
+        .frame(width: 360, alignment: .top)
+        .frame(minHeight: 410, alignment: .top)
     }
 
     // MARK: - Header
@@ -54,15 +55,16 @@ struct PopoverView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: OnlyEQIcon.symbolName)
-                .font(.system(size: 12, weight: .bold))
+                .font(.callout.weight(.bold))
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor))
-            Text("OnlyEQ").font(.system(size: 13, weight: .semibold))
+            Text("OnlyEQ").font(.body.weight(.semibold))
             Spacer()
             Toggle("", isOn: $state.isEnabled)
                 .toggleStyle(AccentSwitchStyle())
                 .labelsHidden()
+                .accessibilityLabel("Enable EQ")
         }
         .padding(.horizontal, 2)
     }
@@ -74,7 +76,7 @@ struct PopoverView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     Image(systemName: state.currentDevice?.icon ?? "speaker.slash")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.title3.weight(.medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(Color.primary.opacity(0.07)))
@@ -93,10 +95,10 @@ struct PopoverView: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(state.currentDevice?.name ?? "No Output Device")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.body.weight(.medium))
                                 .lineLimit(1)
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -135,19 +137,19 @@ struct PopoverView: View {
                         Menu("Delete Preset") {
                             ForEach(state.store.customPresets) { preset in
                                 Button(preset.name, role: .destructive) {
-                                WindowManager.shared.confirmDeletePreset(preset)
-                            }
+                                    WindowManager.shared.confirmDeletePreset(preset)
+                                }
                             }
                         }
                     }
                 } label: {
                     HStack(spacing: 4) {
                         Text(state.preset.name)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.body.weight(.medium))
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -191,13 +193,13 @@ struct PopoverView: View {
         Card {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield")
-                    .font(.system(size: 22))
+                    .font(.title)
                     .foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Confirm System Audio access")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                     Text("Play any audio to confirm. If it stays silent, allow OnlyEQ in System Settings.")
-                        .font(.system(size: 11))
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Open System Settings") { PermissionHelper.openSystemSettings() }
@@ -216,13 +218,13 @@ struct PopoverView: View {
                 WindowManager.shared.showEditor(importing: true)
             } label: {
                 Label("Import…", systemImage: "square.and.arrow.down")
-                    .font(.system(size: 11))
+                    .font(.subheadline)
             }
             Button {
                 WindowManager.shared.showEditor()
             } label: {
                 Label("Editor", systemImage: "slider.horizontal.3")
-                    .font(.system(size: 11))
+                    .font(.subheadline)
             }
             Menu {
                 Button("Settings…") { WindowManager.shared.showSettings() }
@@ -238,6 +240,7 @@ struct PopoverView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Settings, updates, quit")
+            .accessibilityLabel("Settings, updates, quit")
             Spacer()
             statusIndicator
         }
@@ -252,7 +255,7 @@ struct PopoverView: View {
                 .fill(statusColor)
                 .frame(width: 7, height: 7)
             Text(statusText)
-                .font(.system(size: 10))
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -296,11 +299,12 @@ struct BoostSlider: View {
         VStack(spacing: 3) {
             HStack(spacing: 8) {
                 Image(systemName: displayedValue == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 11))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
+                    .accessibilityHidden(true)
                 Text("\(Int(displayedValue.rounded()))%")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .frame(width: 36, alignment: .trailing)
@@ -373,7 +377,7 @@ struct BoostSlider: View {
                     Text("\(Int(maxPercent))%")
                         .position(x: sliderPosition(for: 1, width: width), y: 5)
                 }
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(.tertiary)
             }
             .frame(height: 11)
