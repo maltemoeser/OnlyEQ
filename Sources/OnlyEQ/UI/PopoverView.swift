@@ -1,214 +1,94 @@
 import SwiftUI
 
-/// Rounded card used for every popover section (GroupBox renders as a flat
-/// gray slab inside popovers, so we roll our own).
-struct Card<Content: View>: View {
-    @ViewBuilder var content: Content
+// DIRECTION CONTRACT (surface seed 1512465f, structure 7 of 7)
+// THESIS: The curve is the product, so the popover is one instrument rather
+//   than a stack of cards. The live response fills the left pane at full
+//   height; the controls stand in one column beside it and read top to
+//   bottom as the signal path. Refused: header, three same-size cards, footer.
+// OWN-WORLD: macOS itself. The system's menu-bar material, the system accent,
+//   San Francisco, native menus and bordered buttons. The only chromatic mark
+//   is the accent curve breathing over the grey input spectrum. No cards:
+//   rows are separated by space; the plot alone sits in a hairline well, the
+//   one surface the app draws, and every plot in the app sits in the same one.
+// STORY: Open, watch the curve under the music, see which device and preset
+//   are live, flip Bypass to hear it flat, close. Editing happens elsewhere.
+// FIRST VIEWPORT: 560 × 272 pt. Left, 288 pt: the plot with its axis and a
+//   status pill in the corner. Right, 230 pt: OnlyEQ and its switch; output
+//   device with volume; preset with its device binding and Bypass |
+//   Crossfeed; Import…, Equalizer, and the gear at the bottom.
+// FORM: two-pane popover, candidate 7 of the grounded list, key 1512465f.
+// FINISH: unreviewed and undocumented is unfinished; this build ends with
+//   the finish review, the verdict, and DESIGN.md.
 
-    var body: some View {
-        content
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.055))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-                    )
-            )
-    }
-}
-
-/// Main menu-bar popover: header + master toggle, device card with boost
-/// volume, preset card, curve preview, footer.
+/// Main menu-bar popover: the live curve on the left, one column of controls
+/// on the right.
 struct PopoverView: View {
     @EnvironmentObject var state: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("showLatency") private var showLatency = true
 
+    static let width: CGFloat = 560
+    static let minHeight: CGFloat = 272
+    static let cornerRadius: CGFloat = 14
+
     var body: some View {
-        VStack(spacing: 10) {
-            header
-            Group {
-                deviceCard
-                if let suggestion = state.pendingProfileSuggestion,
-                   suggestion.deviceUID == state.currentDevice?.uid {
-                    suggestionBanner(suggestion)
-                }
-                presetCard
-                if state.suspectedPermissionIssue {
-                    permissionBanner
-                } else {
-                    curvePreview
-                }
-            }
-            .disabled(!state.isEnabled)
-            .opacity(state.isEnabled ? 1 : 0.45)
-            footer
+        HStack(alignment: .top, spacing: 14) {
+            curvePane
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            controlColumn
+                .frame(width: 230)
         }
         .padding(14)
-        // Keep the host size stable when the permission banner replaces the
-        // curve. AppDelegate can then size the popover once instead of asking
-        // SwiftUI to propagate preferred-size changes on every spectrum frame.
-        .frame(width: 360, alignment: .top)
-        .frame(minHeight: 410, alignment: .top)
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: OnlyEQIcon.symbolName)
-                .font(.callout.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.accentColor))
-            Text("OnlyEQ").font(.body.weight(.semibold))
-            Spacer()
-            Toggle("", isOn: $state.isEnabled)
-                .toggleStyle(AccentSwitchStyle())
-                .labelsHidden()
-                .accessibilityLabel("Enable EQ")
-        }
-        .padding(.horizontal, 2)
-    }
-
-    // MARK: - Device
-
-    private var deviceCard: some View {
-        Card {
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    Image(systemName: state.currentDevice?.icon ?? "speaker.slash")
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Color.primary.opacity(0.07)))
-                    Menu {
-                        ForEach(state.devices) { device in
-                            Button {
-                                state.selectOutputDevice(device)
-                            } label: {
-                                if device.id == state.currentDevice?.id {
-                                    Label(device.name, systemImage: "checkmark")
-                                } else {
-                                    Text(device.name)
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(state.currentDevice?.name ?? "No Output Device")
-                                .font(.body.weight(.medium))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    Spacer(minLength: 0)
-                }
-                BoostSlider(
-                    value: $state.userVolumePercent,
-                    maxPercent: state.maxBoostPercent,
-                    onPreview: { state.previewVolumeAdjustment($0) },
-                    onEditingChanged: { editing in
-                        if editing {
-                            state.beginVolumeAdjustment()
-                        } else {
-                            state.endVolumeAdjustment()
-                        }
-                    }
-                )
-            }
+        // Sized once when shown so the host panel never resizes while open;
+        // it grows only with the system text size.
+        .frame(width: Self.width, alignment: .top)
+        .frame(minHeight: Self.minHeight, alignment: .top)
+        .onExitCommand {
+            NotificationCenter.default.post(name: .onlyEQHideMenuPanel, object: nil)
         }
     }
 
-    // MARK: - Preset
+    // MARK: - Curve pane
 
-    private var presetCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Menu {
-                        ForEach(state.store.allPresets) { preset in
-                            Button(preset.name) { state.apply(preset) }
-                        }
-                        if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
-                            Divider()
-                            Button("Delete “\(stored.name)”…", role: .destructive) {
-                                WindowManager.shared.confirmDeletePreset(stored)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(state.preset.name)
-                                .font(.body.weight(.medium))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .help(presetBindingCaption.map { "\($0). Choose a preset to use it on this device." } ?? "Preset")
-                    Spacer(minLength: 8)
-                    Toggle("Bypass", isOn: $state.bypassed)
-                        .help("Hear the unprocessed signal without changing the preset")
-                    Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
-                        .help("Blend a little of each channel into the other for headphones")
+    private var curvePane: some View {
+        VStack(spacing: 4) {
+            ZStack(alignment: .topTrailing) {
+                if state.suspectedPermissionIssue {
+                    permissionNotice
+                } else {
+                    curveButton
+                    statusIndicator
+                        .padding(8)
                 }
-                .toggleStyle(.button)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                // The binding that makes "set once" work is otherwise invisible
-                // here; name it under the preset.
-                if let caption = presetBindingCaption {
-                    Text(caption)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .padding(.leading, 2)
+                if let suggestion = state.pendingProfileSuggestion,
+                   suggestion.deviceUID == state.currentDevice?.uid {
+                    suggestionNotice(suggestion)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(8)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035)))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            FrequencyAxisLabels(compact: true)
+                .padding(.horizontal, 1)
         }
+        .opacity(state.isEnabled ? 1 : 0.45)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.isEnabled)
     }
 
-    /// "Auto on External Headphones" while the current preset is the one
-    /// stored for the current device; nil when the preset is only a stash.
-    private var presetBindingCaption: String? {
-        guard let device = state.currentDevice,
-              let profile = state.store.deviceProfiles[device.uid],
-              profile.presetID == state.preset.id else { return nil }
-        return profile.autoApply ? "Auto on \(device.name)" : "Saved for \(device.name)"
-    }
-
-    // MARK: - Curve preview
-
-    private var curvePreview: some View {
+    private var curveButton: some View {
         Button {
             WindowManager.shared.showEditor()
         } label: {
-            Card {
-                VStack(spacing: 5) {
-                    EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
-                                showSpectrum: state.isEnabled && state.popoverIsVisible,
-                                spectrumStyle: .subtle, rangeDB: state.preset.displayRangeDB)
-                        .frame(height: 116)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .opacity(state.bypassed ? 0.5 : 1)
-                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
-                    FrequencyAxisLabels(compact: true)
-                }
-            }
-            .contentShape(Rectangle())
+            EQCurveView(bands: state.bypassed ? [] : state.preset.bands, preampDB: 0,
+                        showSpectrum: state.isEnabled && state.popoverIsVisible,
+                        spectrumStyle: .normal, rangeDB: state.preset.displayRangeDB)
+                .padding(.vertical, 1)
+                .opacity(state.bypassed ? 0.5 : 1)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Open the equalizer")
@@ -216,105 +96,22 @@ struct PopoverView: View {
         .accessibilityHint("Opens the equalizer")
     }
 
-    /// Replaces the old behaviour of opening the equalizer with an import
-    /// sheet the moment new headphones connect. The offer waits here instead.
-    private func suggestionBanner(_ suggestion: ProfileSuggestion) -> some View {
-        Card {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "headphones.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("New headphones")
-                        .font(.callout.weight(.semibold))
-                    Text("Find a preset tuned for \(suggestion.deviceName)?")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        Button("Find Preset") {
-                            state.pendingProfileSuggestion = nil
-                            WindowManager.shared.showEditor(importing: true, profileSuggestion: suggestion)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        Button("Not Now") { state.pendingProfileSuggestion = nil }
-                    }
-                    .controlSize(.small)
-                    .padding(.top, 2)
-                }
-            }
-        }
-    }
-
-    private var permissionBanner: some View {
-        Card {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "lock.shield")
-                    .font(.title)
-                    .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Confirm System Audio access")
-                        .font(.callout.weight(.semibold))
-                    Text("Play any audio to confirm. If it stays silent, allow OnlyEQ in System Settings.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("Open System Settings") { PermissionHelper.openSystemSettings() }
-                        .controlSize(.small)
-                        .padding(.top, 2)
-                }
-            }
-        }
-    }
-
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack(spacing: 6) {
-            Button {
-                WindowManager.shared.showEditor(importing: true)
-            } label: {
-                Label("Import…", systemImage: "square.and.arrow.down")
-                    .font(.subheadline)
-            }
-            Button {
-                WindowManager.shared.showEditor()
-            } label: {
-                Label("Equalizer", systemImage: "slider.horizontal.3")
-                    .font(.subheadline)
-            }
-            Menu {
-                Button("Settings…") { WindowManager.shared.showSettings() }
-                Button("Check for Updates…") {
-                    (NSApp.delegate as? AppDelegate)?.checkForUpdates()
-                }
-                Divider()
-                Button("Quit OnlyEQ") { NSApp.terminate(nil) }
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Settings, updates, quit")
-            .accessibilityLabel("Settings, updates, quit")
-            Spacer()
-            statusIndicator
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .padding(.horizontal, 2)
-    }
-
     private var statusIndicator: some View {
         HStack(spacing: 5) {
             Circle()
                 .fill(statusColor)
-                .frame(width: 7, height: 7)
+                .frame(width: 6, height: 6)
             Text(statusText)
-                .font(.caption)
+                .font(.caption2.weight(.medium))
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(.background.opacity(0.6)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Status")
+        .accessibilityValue(statusText)
     }
 
     private var statusColor: Color {
@@ -329,15 +126,210 @@ struct PopoverView: View {
     }
 
     private var statusText: String {
-        guard state.isEnabled else { return "Inactive" }
+        guard state.isEnabled else { return "Off" }
         switch state.engineState {
         case .running:
             if state.suspectedPermissionIssue { return "Waiting for audio" }
             if state.bypassed { return "Bypassed" }
             return showLatency ? "Active · \(state.latencyMilliseconds) ms" : "Active"
-        case .stopped: return "Inactive"
+        case .stopped: return "Off"
         case .failed: return "Error"
         }
+    }
+
+    /// Replaces the old behaviour of opening the equalizer with an import
+    /// sheet the moment new headphones connect. The offer waits here instead.
+    private func suggestionNotice(_ suggestion: ProfileSuggestion) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "headphones.circle.fill")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("New headphones")
+                    .font(.callout.weight(.semibold))
+                Text("Find a preset tuned for \(suggestion.deviceName)?")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button("Find Preset") {
+                        state.pendingProfileSuggestion = nil
+                        WindowManager.shared.showEditor(importing: true, profileSuggestion: suggestion)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button("Not Now") { state.pendingProfileSuggestion = nil }
+                }
+                .controlSize(.small)
+                .padding(.top, 2)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.background.opacity(0.85)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+    }
+
+    private var permissionNotice: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "lock.shield")
+                .font(.largeTitle)
+                .foregroundStyle(Color.accentColor)
+            Text("Confirm System Audio access")
+                .font(.callout.weight(.semibold))
+            Text("Play any audio to confirm. If it stays silent, allow OnlyEQ in System Settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Open System Settings") { PermissionHelper.openSystemSettings() }
+                .controlSize(.small)
+                .padding(.top, 2)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Control column
+
+    private var controlColumn: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            Group {
+                deviceRow
+                presetRow
+            }
+            .disabled(!state.isEnabled)
+            .opacity(state.isEnabled ? 1 : 0.45)
+            Spacer(minLength: 0)
+            footer
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            AppBadge()
+            Text("OnlyEQ").font(.body.weight(.semibold))
+            Spacer()
+            Toggle("", isOn: $state.isEnabled)
+                .toggleStyle(AccentSwitchStyle())
+                .labelsHidden()
+                .accessibilityLabel("Enable EQ")
+        }
+    }
+
+    private var deviceRow: some View {
+        IdentityRow(symbol: state.currentDevice?.icon ?? "speaker.slash", symbolLabel: "Output device") {
+            Menu {
+                ForEach(state.devices) { device in
+                    Button {
+                        state.selectOutputDevice(device)
+                    } label: {
+                        if device.id == state.currentDevice?.id {
+                            Label(device.name, systemImage: "checkmark")
+                        } else {
+                            Text(device.name)
+                        }
+                    }
+                }
+            } label: {
+                menuLabel(state.currentDevice?.name ?? "No Output Device")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+            .help("Output device")
+        } detail: {
+            BoostSlider(
+                value: $state.userVolumePercent,
+                maxPercent: state.maxBoostPercent,
+                onPreview: { state.previewVolumeAdjustment($0) },
+                onEditingChanged: { editing in
+                    if editing {
+                        state.beginVolumeAdjustment()
+                    } else {
+                        state.endVolumeAdjustment()
+                    }
+                }
+            )
+        }
+    }
+
+    private var presetRow: some View {
+        IdentityRow(symbol: "slider.horizontal.3", symbolLabel: "Preset") {
+            Menu {
+                ForEach(state.store.allPresets) { preset in
+                    Button(preset.name) { state.apply(preset) }
+                }
+                if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
+                    Divider()
+                    Button("Delete “\(stored.name)”…", role: .destructive) {
+                        WindowManager.shared.confirmDeletePreset(stored)
+                    }
+                }
+            } label: {
+                menuLabel(state.preset.name)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
+            .help(presetBindingCaption.map { "\($0). Choose a preset to use it on this device." } ?? "Preset")
+        } detail: {
+            VStack(alignment: .leading, spacing: 8) {
+                // The binding that makes "set once" work is otherwise
+                // invisible; name it under the preset.
+                Text(presetBindingCaption ?? "Not saved for this device")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Toggle("Bypass", isOn: $state.bypassed)
+                        .help("Hear the unprocessed signal without changing the preset")
+                    Toggle("Crossfeed", isOn: $state.crossfeedEnabled)
+                        .help("Blend a little of each channel into the other for headphones")
+                }
+                .toggleStyle(.button)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private func menuLabel(_ name: String) -> some View {
+        Text(name)
+            .font(.body.weight(.medium))
+            .lineLimit(1)
+            .truncationMode(.middle)
+    }
+
+    /// "Auto on External Headphones" while the current preset is the one
+    /// stored for the current device; nil when the preset is only a stash.
+    private var presetBindingCaption: String? {
+        guard let device = state.currentDevice,
+              let profile = state.store.deviceProfiles[device.uid],
+              profile.presetID == state.preset.id else { return nil }
+        return profile.autoApply ? "Auto on \(device.name)" : "Saved for \(device.name)"
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: 6) {
+            Button {
+                WindowManager.shared.showEditor(importing: true)
+            } label: {
+                Label("Import…", systemImage: "square.and.arrow.down")
+            }
+            Button {
+                WindowManager.shared.showEditor()
+            } label: {
+                Label("Equalizer", systemImage: "slider.horizontal.3")
+            }
+            Spacer(minLength: 0)
+            AppGearMenu()
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
     }
 }
 
@@ -439,7 +431,7 @@ struct BoostSlider: View {
                         .position(x: sliderPosition(for: 1, width: width), y: 5)
                 }
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             }
             .frame(height: 11)
             // Match the icon + spacing + fixed percentage field + spacing

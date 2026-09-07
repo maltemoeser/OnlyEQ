@@ -14,6 +14,9 @@ struct EditorView: View {
 
     var initialImportRequested = false
     var initialProfileSuggestion: ProfileSuggestion?
+    /// Draw the toolbar as a row inside the view instead of as window
+    /// toolbar items; only the screenshot renderer wants this.
+    var inlineToolbar = false
 
     @EnvironmentObject var state: AppState
     @Environment(\.undoManager) private var undoManager
@@ -29,20 +32,15 @@ struct EditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if state.editorShowsSettings {
-                settingsBar
-                Divider()
-                SettingsView()
-            } else {
-                toolbar
-                compareRow
-                Divider()
-                graph
-                bandStrip
-                Divider()
-                bottomBar
-            }
+            if inlineToolbar { inlineToolbarRow }
+            compareRow
+            Divider()
+            graph
+            bandStrip
+            Divider()
+            bottomBar
         }
+        .toolbar { if !inlineToolbar { windowToolbar } }
         .sheet(item: $importPresentation) { presentation in
             ImportSheet(profileSuggestion: presentation.profileSuggestion).environmentObject(state)
         }
@@ -139,82 +137,94 @@ struct EditorView: View {
 
     // MARK: - Toolbar
 
-    private var toolbar: some View {
+    /// Height of the window's unified title bar; the inline stand-in used by
+    /// the screenshot renderer matches it so renders look like the window.
+    static let toolbarHeight: CGFloat = 52
+    /// Clears the window controls in the inline stand-in.
+    static let toolbarLeadingInset: CGFloat = 84
+
+    /// The same controls the real toolbar carries, laid out as a row for the
+    /// offscreen renderer, which cannot draw an NSToolbar.
+    private var inlineToolbarRow: some View {
         HStack(spacing: 10) {
-            Menu {
-                ForEach(state.store.allPresets) { preset in
-                    Button(preset.name) {
-                        state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
-                    }
-                }
-                if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
-                    Divider()
-                    Button("Delete “\(stored.name)”…", role: .destructive) {
-                        WindowManager.shared.confirmDeletePreset(stored)
-                    }
-                }
-            } label: {
-                Text(state.preset.name).font(.callout.weight(.medium)).lineLimit(1)
-            }
-            .frame(maxWidth: 220)
-
-            Button("Save…") {
-                saveName = state.preset.name
-                showSaveSheet = true
-            }
-            .keyboardShortcut("s", modifiers: .command)
-            .help("Save the current curve as a preset")
-
-            Button("Revert") {
-                state.recordingUndo("Revert", undoManager) { state.revertPreset() }
-            }
-                .disabled(!state.presetIsModified)
-                .help("Discard edits and return to the saved preset")
-
+            presetMenu
+            saveButton
+            revertButton
             Spacer()
-
-            Toggle("Bypass", isOn: $state.bypassed)
-                .toggleStyle(.button)
-
+            bypassToggle
             Spacer()
-
-            Button {
-                importPresentation = ImportPresentation(profileSuggestion: nil)
-            } label: {
-                Label("Import…", systemImage: "square.and.arrow.down")
-            }
-
-            Button {
-                state.editorShowsSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            importButton
+            AppGearMenu()
         }
-        .controlSize(.small)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 8)
+        .padding(.leading, Self.toolbarLeadingInset)
+        .padding(.trailing, 24)
+        .frame(height: Self.toolbarHeight)
     }
 
-    private var settingsBar: some View {
-        HStack {
-            Button {
-                state.editorShowsSettings = false
-            } label: {
-                Label("Equalizer", systemImage: "chevron.left")
-            }
-            .keyboardShortcut(.cancelAction)
-            Spacer()
-            Text("Settings").font(.callout.weight(.semibold))
-            Spacer()
-            // Balances the leading button so the title stays centred.
-            Label("Equalizer", systemImage: "chevron.left").hidden()
+    @ToolbarContentBuilder
+    private var windowToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            presetMenu
+            saveButton
+            revertButton
         }
-        .controlSize(.small)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 8)
+        ToolbarItem(placement: .principal) { bypassToggle }
+        ToolbarItemGroup(placement: .primaryAction) {
+            importButton
+            AppGearMenu()
+        }
+    }
+
+    private var presetMenu: some View {
+        Menu {
+            ForEach(state.store.allPresets) { preset in
+                Button(preset.name) {
+                    state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
+                }
+            }
+            if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
+                Divider()
+                Button("Delete “\(stored.name)”…", role: .destructive) {
+                    WindowManager.shared.confirmDeletePreset(stored)
+                }
+            }
+        } label: {
+            Text(state.preset.name).fontWeight(.medium).lineLimit(1)
+        }
+        .frame(maxWidth: 240)
+        .help("Preset")
+    }
+
+    private var saveButton: some View {
+        Button("Save…") {
+            saveName = state.preset.name
+            showSaveSheet = true
+        }
+        .keyboardShortcut("s", modifiers: .command)
+        .help("Save the current curve as a preset")
+    }
+
+    private var revertButton: some View {
+        Button("Revert") {
+            state.recordingUndo("Revert", undoManager) { state.revertPreset() }
+        }
+        .disabled(!state.presetIsModified)
+        .help("Discard edits and return to the saved preset")
+    }
+
+    private var bypassToggle: some View {
+        Toggle("Bypass", isOn: $state.bypassed)
+            .toggleStyle(.button)
+            .help("Hear the unprocessed signal without changing the preset")
+    }
+
+    private var importButton: some View {
+        Button {
+            importPresentation = ImportPresentation(profileSuggestion: nil)
+        } label: {
+            Label("Import…", systemImage: "square.and.arrow.down")
+        }
+        .help("Import a preset from a file, text, or the online databases")
     }
 
     // MARK: - Graph
@@ -268,10 +278,10 @@ struct EditorView: View {
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
                 } else if bandLimitReached {
                     Label("32 bands maximum", systemImage: "plus.circle")
-                        .font(.caption).foregroundStyle(.tertiary).padding(4)
+                        .font(.caption).foregroundStyle(.secondary).padding(4)
                 } else if state.preset.bands.isEmpty {
                     Label("Double-click graph to add band", systemImage: "plus.circle")
-                        .font(.caption).foregroundStyle(.tertiary).padding(4)
+                        .font(.caption).foregroundStyle(.secondary).padding(4)
                 }
             }
             FrequencyAxisLabels()
@@ -287,7 +297,7 @@ struct EditorView: View {
             legendItem("Output", color: Color.accentColor)
         }
         .font(.caption2)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
         .padding(4)
         .help("Grey bars show the audio before EQ; accent bars show it after.")
         .accessibilityElement(children: .combine)

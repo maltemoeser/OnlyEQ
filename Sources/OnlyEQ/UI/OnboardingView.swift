@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// First-launch onboarding: welcome → permission → pick headphones.
+/// First-launch onboarding in the grammar of a macOS setup assistant: one
+/// panel of content, a footer with Back and Continue, three steps.
+/// Welcome → System Audio access → pick headphones.
 struct OnboardingView: View {
     @EnvironmentObject var state: AppState
     @State private var step = 0
@@ -8,6 +10,17 @@ struct OnboardingView: View {
     @State private var isApplying = false
     @State private var applyError: String?
     @State private var selectedEntryID: OnlineEntry.ID?
+
+    static let width: CGFloat = 560
+    static let height: CGFloat = 460
+
+    /// The HD 650 correction that ships as a test fixture. Shown on the
+    /// welcome panel so the first thing a new user sees is what the app does.
+    private static let sampleBands: [EQBand] = {
+        guard let url = Bundle.module.url(forResource: "Fixtures/autoeq_parametric.txt", withExtension: nil),
+              let preset = try? PresetImporter.importFile(at: url).preset else { return [] }
+        return preset.bands
+    }()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,74 +32,82 @@ struct OnboardingView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
-                    Circle()
-                        .fill(i == step ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .frame(width: 7, height: 7)
-                }
-            }
-            .padding(.bottom, 16)
+            Divider()
+            footer
         }
-        .frame(width: 520, height: 440)
+        // Fixed width; the height follows the system text size.
+        .frame(width: Self.width)
+        .frame(minHeight: Self.height)
     }
 
+    // MARK: - Steps
+
     private var welcome: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             Spacer()
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(.white)
-                .frame(width: 88, height: 88)
-                .background(RoundedRectangle(cornerRadius: 20).fill(Color.accentColor))
-            Text("System-wide EQ\nfor your Mac")
-                .font(.largeTitle.weight(.bold))
-                .multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                AppBadge(size: 30)
+                Text("Welcome to OnlyEQ")
+                    .font(.title.weight(.bold))
+            }
             Text("A parametric EQ for everything your Mac plays. Nothing to install, nothing to babysit.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
+                .padding(.top, 8)
+            // Not a decoration: this is a real headphone correction, the kind
+            // the last step imports for your own headphones.
+            VStack(spacing: 4) {
+                EQCurveView(bands: Self.sampleBands, preampDB: 0, showSpectrum: false, rangeDB: 12)
+                    .frame(height: 150)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.035)))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                FrequencyAxisLabels()
+            }
+            .padding(.top, 24)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Example correction curve for Sennheiser HD 650 headphones")
+            Text("The correction curve for a pair of Sennheiser HD 650s, from AutoEq.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
             Spacer()
-            Button("Get Started") { step = 1 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            Spacer().frame(height: 8)
         }
-        .padding(24)
+        .padding(.horizontal, 40)
+        .padding(.top, 28)
     }
 
     private var permission: some View {
         VStack(spacing: 12) {
             Spacer()
-            HStack(spacing: 8) {
-                Image(systemName: "menubar.rectangle").font(.largeTitle).foregroundStyle(.secondary)
-                Image(systemName: "record.circle").font(.title2).foregroundStyle(.purple)
-            }
+            Image(systemName: "waveform.badge.mic")
+                .font(.system(size: 40))
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
             Text("Allow System Audio access")
-                .font(.title.weight(.bold))
-            Text("macOS shows a recording indicator while EQ is active.\nAudio never leaves your Mac.")
+                .font(.title2.weight(.bold))
+            Text("OnlyEQ is asking macOS for the system audio. macOS shows a recording indicator while the EQ runs; audio never leaves your Mac.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
             Button("Open System Settings") { PermissionHelper.openSystemSettings() }
                 .buttonStyle(.borderedProminent)
-            Button("I’ve Enabled It") { step = 2 }
-
-            GroupBox {
-                HStack(spacing: 8) {
-                    if state.engineState == .running && !state.suspectedPermissionIssue {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        Text("Permission granted").font(.callout.weight(.medium))
-                    } else {
-                        ProgressView().controlSize(.small)
-                        Text("Waiting… play some audio to confirm")
-                            .font(.callout).foregroundStyle(.secondary)
-                    }
+                .padding(.top, 4)
+            HStack(spacing: 8) {
+                if state.engineState == .running && !state.suspectedPermissionIssue {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Access granted").font(.callout.weight(.medium))
+                } else {
+                    ProgressView().controlSize(.small)
+                    Text("Waiting. Play some audio to confirm.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .padding(4)
             }
-            .frame(width: 320)
+            .padding(.top, 12)
+            .accessibilityElement(children: .combine)
             Spacer()
         }
         .padding(24)
@@ -98,21 +119,17 @@ struct OnboardingView: View {
 
     private var pickHeadphones: some View {
         VStack(spacing: 10) {
-            Text("Search your headphones\nto auto-EQ them")
-                .font(.title.weight(.bold))
-                .multilineTextAlignment(.center)
-                .padding(.top, 18)
-            Text("Pick your headphones to import a preset tuned for them.")
+            Text("Which headphones do you use?")
+                .font(.title2.weight(.bold))
+                .padding(.top, 28)
+            Text("OnlyEQ imports a correction preset tuned for them and applies it whenever they connect.")
                 .font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
 
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Sony WH-1000XM5", text: $searchText)
-                    .textFieldStyle(.plain)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5)))
-            .padding(.horizontal, 20)
+            SearchField(text: $searchText, prompt: "Sony WH-1000XM5")
+                .padding(.horizontal, 24)
+                .padding(.top, 6)
 
             Group {
                 if state.onlineDB.isLoading {
@@ -148,19 +165,37 @@ struct OnboardingView: View {
                 }
             }
             .frame(maxHeight: .infinity)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
 
             if let applyError {
                 Label(applyError, systemImage: "wifi.exclamationmark")
                     .font(.caption).foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
             }
+        }
+        .task { await state.onlineDB.load(source: .peqdb) }
+    }
 
-            HStack {
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack {
+            if step > 0 {
+                Button("Back") { step -= 1 }
+            }
+            Spacer()
+            switch step {
+            case 0:
+                Button("Continue") { step = 1 }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            case 1:
+                Button("Continue") { step = 2 }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            default:
                 Button("Skip and Start Flat") { finish(apply: nil) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                Spacer()
                 Button("Start Listening") {
                     if let entry = selectedEntry { applyEntry(entry) }
                 }
@@ -168,9 +203,9 @@ struct OnboardingView: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(isApplying || selectedEntry == nil)
             }
-            .padding(16)
         }
-        .task { await state.onlineDB.load(source: .peqdb) }
+        .controlSize(.large)
+        .padding(16)
     }
 
     private var selectedEntry: OnlineEntry? {
