@@ -599,6 +599,13 @@ enum TestRunner {
         let old = try JSONDecoder().decode(EQPreset.self, from: Data(legacy.utf8))
         expect(old.adjustment.isNeutral, "a preset saved without an adjustment decodes as neutral")
 
+        expect(EQBand.openFrequency(among: []) == 1000, "an empty preset opens at 1 kHz")
+        expect(EQBand.openFrequency(among: [EQBand(frequency: 100), EQBand(frequency: 10000)]) == 1000,
+               "a new band centres the widest gap")
+        expect(EQBand.openFrequency(among: [EQBand(frequency: 1000)]) == 141, "the widest gap can be below the bands")
+        let crowded = [100.0, 200, 400, 800, 1600, 3200, 6400, 12800].map { EQBand(frequency: $0) }
+        expect(near(EQBand.openFrequency(among: crowded), 45, 1), "a crowded preset opens at its low end")
+
         MainActor.assumeIsolated {
             AppState.screenshotMode = true  // no engine, no persistence
             let state = AppState.shared
