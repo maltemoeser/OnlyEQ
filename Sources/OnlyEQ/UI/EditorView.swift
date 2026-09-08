@@ -45,7 +45,10 @@ struct EditorView: View {
             Divider()
             bottomBar
         }
+        .navigationTitle(state.preset.name)
+        .navigationSubtitle(state.presetIsModified ? "Edited" : "")
         .toolbar { if !inlineToolbar { windowToolbar } }
+        .toolbarTitleMenu { presetMenuItems }
         .sheet(item: $importPresentation) { presentation in
             ImportSheet(profileSuggestion: presentation.profileSuggestion).environmentObject(state)
         }
@@ -129,13 +132,13 @@ struct EditorView: View {
     static let toolbarLeadingInset: CGFloat = 84
 
     /// The same controls the real toolbar carries, laid out as a row for the
-    /// offscreen renderer, which cannot draw an NSToolbar.
+    /// offscreen renderer, which cannot draw an NSToolbar or its title menu.
     private var inlineToolbarRow: some View {
         HStack(spacing: 10) {
-            presetMenu
+            inlineTitle
+            Spacer()
             saveButton
             revertButton
-            Spacer()
             bypassToggle
             AppGearMenu()
         }
@@ -146,8 +149,7 @@ struct EditorView: View {
 
     @ToolbarContentBuilder
     private var windowToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            presetMenu
+        ToolbarItemGroup(placement: .automatic) {
             saveButton
             revertButton
         }
@@ -157,8 +159,26 @@ struct EditorView: View {
         }
     }
 
-    private var presetMenu: some View {
+    /// Stand-in for the window title and its menu in the offscreen render.
+    private var inlineTitle: some View {
         Menu {
+            presetMenuItems
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(state.preset.name).font(.headline).lineLimit(1)
+                if state.presetIsModified {
+                    Text("Edited").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .padding(.trailing, 16)
+    }
+
+    /// The preset list behind the window title: switch, import, delete.
+    private var presetMenuItems: some View {
+        Group {
             ForEach(state.store.allPresets) { preset in
                 Button(preset.name) {
                     state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
@@ -174,11 +194,7 @@ struct EditorView: View {
                     WindowManager.shared.confirmDeletePreset(stored)
                 }
             }
-        } label: {
-            Text(state.preset.name).fontWeight(.medium).lineLimit(1)
         }
-        .frame(maxWidth: 240)
-        .help("Preset")
     }
 
     private var saveButton: some View {
@@ -245,11 +261,7 @@ struct EditorView: View {
             .opacity(state.bypassed ? 0.45 : 1)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
-                HStack(spacing: 10) {
-                    Text("+\(Int(state.heardPreset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary)
-                    referencePill.controlSize(.small)
-                }
-                .padding(4)
+                Text("+\(Int(state.heardPreset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .bottomLeading) {
                 Text("−\(Int(state.heardPreset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
@@ -260,19 +272,21 @@ struct EditorView: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if state.bypassed {
-                    Label("Bypassed", systemImage: "waveform.slash")
-                        .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
-                } else if state.hearingReference {
-                    Label("Hearing reference", systemImage: "ear")
-                        .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
-                } else if bandLimitReached {
-                    Text("32 bands maximum")
-                        .font(.caption).foregroundStyle(.secondary).padding(4)
-                } else if state.preset.bands.isEmpty {
-                    Label("Double-click graph to add band", systemImage: "plus.circle")
-                        .font(.caption).foregroundStyle(.secondary).padding(4)
+                // The pill itself shows the hearing state, so no label repeats it.
+                HStack(spacing: 10) {
+                    if state.bypassed {
+                        Label("Bypassed", systemImage: "waveform.slash")
+                            .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    } else if bandLimitReached {
+                        Text("32 bands maximum")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if state.preset.bands.isEmpty {
+                        Label("Double-click graph to add band", systemImage: "plus.circle")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    referencePill.controlSize(.small)
                 }
+                .padding(4)
             }
             FrequencyAxisLabels()
         }
@@ -587,7 +601,7 @@ struct EditorView: View {
     /// since the editor opened so a brief clip is not missed.
     private var clipIndicator: some View {
         PeakMeterView(processor: state.engine.processor, isActive: state.editorIsVisible)
-            .frame(width: 124, height: 14)
+            .frame(width: PeakMeterNSView.preferredWidth, height: 14)
             .help("Output peak after the limiter, and the highest since the editor opened. Click to reset.")
     }
 
@@ -693,7 +707,7 @@ struct PeakHold: Equatable {
 }
 
 /// Keeps the display-linked peak readout out of SwiftUI's view graph. Updating this
-/// AppKit view redraws only its 124×14-point bounds instead of the editor.
+/// AppKit view redraws only its own small bounds instead of the editor.
 private struct PeakMeterView: NSViewRepresentable {
     let processor: EQProcessor
     let isActive: Bool
@@ -717,26 +731,53 @@ private struct PeakMeterView: NSViewRepresentable {
 private final class PeakMeterNSView: NSView {
     private let processor: EQProcessor
     private let dotLayer = CAShapeLayer()
-    private let textLayer = CATextLayer()
+    /// The current peak, the "dBFS  max" caption, and the held peak. Each
+    /// number sits right-aligned in a slot wide enough for "−60.0", so the
+    /// readout stays put as digits come and go.
+    private let currentLayer = CATextLayer()
+    private let captionLayer = CATextLayer()
+    private let heldLayer = CATextLayer()
+    private let font: NSFont
     private var animationLink: CADisplayLink?
     private var active = false
     private var hold = PeakHold()
     private var renderedLabel = ""
     private var renderedColor: NSColor?
 
+    private static let caption = "dBFS  max"
+
+    /// Width of the widest readout the meter shows.
+    static var slotWidth: CGFloat { width(of: typographic("-60.0"), in: meterFont) }
+    static var captionWidth: CGFloat { width(of: caption, in: meterFont) }
+    /// The full meter width: dot, two number slots, and the caption between.
+    static var preferredWidth: CGFloat { 11 + slotWidth + 4 + captionWidth + 4 + slotWidth }
+
+    private static var meterFont: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .caption1).pointSize,
+                                         weight: .regular)
+    }
+
+    private static func width(of text: String, in font: NSFont) -> CGFloat {
+        ceil(NSAttributedString(string: text, attributes: [.font: font]).size().width)
+    }
+
     init(processor: EQProcessor) {
         self.processor = processor
+        self.font = Self.meterFont
         super.init(frame: .zero)
         wantsLayer = true
         dotLayer.actions = ["path": NSNull(), "fillColor": NSNull()]
-        textLayer.actions = ["string": NSNull(), "foregroundColor": NSNull(),
+        for (layer, alignment) in [(currentLayer, CATextLayerAlignmentMode.right),
+                                   (captionLayer, .left), (heldLayer, .right)] {
+            layer.actions = ["string": NSNull(), "foregroundColor": NSNull(),
                              "bounds": NSNull(), "position": NSNull()]
-        let pointSize = NSFont.preferredFont(forTextStyle: .caption1).pointSize
-        textLayer.font = NSFont.monospacedDigitSystemFont(ofSize: pointSize, weight: .regular)
-        textLayer.fontSize = pointSize
-        textLayer.alignmentMode = .left
+            layer.font = font
+            layer.fontSize = font.pointSize
+            layer.alignmentMode = alignment
+            self.layer?.addSublayer(layer)
+        }
+        captionLayer.string = Self.caption
         layer?.addSublayer(dotLayer)
-        layer?.addSublayer(textLayer)
         setAccessibilityElement(true)
         setAccessibilityRole(.staticText)
         setAccessibilityLabel("Output peak")
@@ -761,8 +802,12 @@ private final class PeakMeterNSView: NSView {
         CATransaction.setDisableActions(true)
         dotLayer.path = CGPath(ellipseIn: CGRect(x: 0, y: max((bounds.height - 7) / 2, 0),
                                                  width: 7, height: 7), transform: nil)
-        textLayer.frame = CGRect(x: 11, y: 0, width: max(bounds.width - 11, 0), height: bounds.height)
-        textLayer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let slot = Self.slotWidth
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        currentLayer.frame = CGRect(x: 11, y: 0, width: slot, height: bounds.height)
+        captionLayer.frame = CGRect(x: 11 + slot + 4, y: 0, width: Self.captionWidth, height: bounds.height)
+        heldLayer.frame = CGRect(x: 11 + slot + 4 + Self.captionWidth + 4, y: 0, width: slot, height: bounds.height)
+        for layer in [currentLayer, captionLayer, heldLayer] { layer.contentsScale = scale }
         CATransaction.commit()
     }
 
@@ -788,7 +833,9 @@ private final class PeakMeterNSView: NSView {
     private func updateLayers(force: Bool = false) {
         let held = hold.heldDB
         let color: NSColor = held > -0.1 ? .systemRed : (held > -3 ? .systemOrange : .systemGreen)
-        let label = typographic(String(format: "%.1f dBFS  max %.1f", hold.currentDB, held))
+        let current = typographic(String(format: "%.1f", hold.currentDB))
+        let maximum = typographic(String(format: "%.1f", held))
+        let label = "\(current) \(Self.caption) \(maximum)"
         guard force || label != renderedLabel || color != renderedColor else { return }
         renderedLabel = label
         renderedColor = color
@@ -797,11 +844,13 @@ private final class PeakMeterNSView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         dotLayer.fillColor = color.cgColor
-        textLayer.string = label
+        currentLayer.string = current
+        heldLayer.string = maximum
         // A dynamic colour must be resolved in this view's appearance, or the
         // layer gets the light-mode grey and disappears on a dark window.
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            textLayer.foregroundColor = NSColor.secondaryLabelColor.cgColor
+            let grey = NSColor.secondaryLabelColor.cgColor
+            for layer in [currentLayer, captionLayer, heldLayer] { layer.foregroundColor = grey }
         }
         CATransaction.commit()
     }

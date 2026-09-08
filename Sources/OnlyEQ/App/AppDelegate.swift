@@ -285,10 +285,9 @@ final class WindowManager {
             window.title = "Equalizer"
             window.minSize = NSSize(width: 720, height: 580)
             window.isReleasedWhenClosed = false
-            // EditorView supplies the toolbar items; the preset menu stands
-            // where a document title would, so the title itself stays hidden.
+            // EditorView supplies the toolbar items and the title: the preset
+            // name, with the preset list as its title menu.
             window.toolbarStyle = .unified
-            window.titleVisibility = .hidden
             let hosting = NSHostingController(
                 rootView: EditorView(initialImportRequested: importing,
                                      initialProfileSuggestion: profileSuggestion)
