@@ -34,13 +34,14 @@ struct EditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if inlineToolbar { inlineToolbarRow }
-            compareRow
-            Divider()
+            if inlineToolbar {
+                inlineToolbarRow
+                Divider()
+            }
             graph
-            bandStrip
+            bandStrip.disabled(state.hearingReference)
             Divider()
-            adjustBar
+            adjustBar.disabled(state.hearingReference)
             Divider()
             bottomBar
         }
@@ -64,79 +65,59 @@ struct EditorView: View {
         }
     }
 
-    // MARK: - Compare (A/B)
+    // MARK: - Reference
 
-    /// Two slots. The selected one is the working copy: what you hear and
-    /// edit. The other waits unchanged as the reference. Each pill names the
-    /// curve it holds, so nothing about the mechanism has to be guessed.
-    private var compareRow: some View {
-        HStack(spacing: 8) {
-            Text("Compare")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            slotPill(0)
-            slotPill(1)
-            Spacer()
-        }
-        .controlSize(.small)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 8)
-        .help("Two slots. The selected one is what you hear and edit; the other waits unchanged. Switching is level-matched.")
-    }
-
+    /// The curve kept aside to listen against. Clicking the pill hears it in
+    /// place of the edit, level-matched; the chevron chooses or swaps it.
     @ViewBuilder
-    private func slotPill(_ slot: Int) -> some View {
-        let letter = slot == 0 ? "A" : "B"
-        let isSelected = state.abSlot == slot
-        if let held = state.abPreset(inSlot: slot) {
-            let name = held.name + (state.abSlotIsModified(slot) ? " (edited)" : "")
-            Button {
-                state.storeABAndSwitch(to: slot, undoManager: undoManager)
+    private var referencePill: some View {
+        if let reference = state.reference {
+            Menu {
+                referenceChoices
+                Divider()
+                Button("Swap with Reference") { state.swapWithReference(undoManager: undoManager) }
+                Button("Clear Reference") { state.setReference(nil, undoManager: undoManager) }
             } label: {
-                slotLabel(letter, name: name, isSelected: isSelected)
+                pillLabel(reference.name, hearing: state.hearingReference)
+            } primaryAction: {
+                state.hearingReference.toggle()
             }
-            .buttonStyle(.bordered)
-            .tint(isSelected ? Color.accentColor : nil)
-            .help(isSelected
-                  ? "\(letter): \(name). Selected: this is what you hear and edit."
-                  : "\(letter): \(name). Waiting unchanged. Click to switch, level-matched.")
-            .accessibilityLabel("Slot \(letter), \(name)")
-            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .menuStyle(.button)
+            .buttonBorderShape(.capsule)
+            .tint(state.hearingReference ? Color.accentColor : nil)
+            .help(state.hearingReference
+                  ? "Hearing the reference. Click to return to your edit."
+                  : "Click to hear \(reference.name) in place of your edit, level-matched.")
+            .accessibilityLabel("Reference, \(reference.name)")
+            .accessibilityValue(state.hearingReference ? "hearing" : "not hearing")
         } else {
             Menu {
-                ForEach(state.store.allPresets) { preset in
-                    Button(preset.name) {
-                        state.compare(with: preset, inSlot: slot, undoManager: undoManager)
-                    }
-                }
-                Divider()
-                Button("Import…") {
-                    state.storeABAndSwitch(to: slot, undoManager: undoManager)
-                    importPresentation = ImportPresentation(profileSuggestion: nil)
-                }
+                referenceChoices
             } label: {
-                // A macOS Menu label keeps only one Text, so this one is concatenated.
-                (Text(Image(systemName: "circle")).foregroundColor(.secondary)
-                    + Text("  \(letter)  ").fontWeight(.semibold)
-                    + Text("Choose…"))
-                    .font(.caption)
+                pillLabel("Compare", hearing: false)
             }
-            .fixedSize()
-            .help("Pick a preset or import one to compare against \(slot == 0 ? "B" : "A"). Nothing is saved until you press Save.")
-            .accessibilityLabel("Slot \(letter), empty. Choose a preset to compare")
+            .menuStyle(.button)
+            .buttonBorderShape(.capsule)
+            .help("Keep a curve aside to listen against your edit.")
+            .accessibilityLabel("Compare: choose a reference")
         }
     }
 
-    private func slotLabel(_ letter: String, name: String, isSelected: Bool) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                .font(.caption2)
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-            Text(letter).font(.caption.weight(.semibold))
-            Text(name).font(.caption).lineLimit(1).truncationMode(.middle)
-                .frame(maxWidth: 200)
+    private var referenceChoices: some View {
+        Group {
+            Button("Use Current Curve as Reference") { state.setReference(state.preset, undoManager: undoManager) }
+            Divider()
+            ForEach(state.store.allPresets) { preset in
+                Button(preset.name) { state.setReference(preset, undoManager: undoManager) }
+            }
         }
-        .fixedSize()
+    }
+
+    private func pillLabel(_ name: String, hearing: Bool) -> some View {
+        // A macOS Menu label keeps only one Text, so this one is concatenated.
+        (Text(Image(systemName: hearing ? "largecircle.fill.circle" : "circle")) + Text("  ") + Text(name))
+            .font(.caption)
+            .lineLimit(1)
     }
 
     // MARK: - Toolbar
@@ -235,13 +216,13 @@ struct EditorView: View {
             // The graph shows the EQ shape only — preamp is gain staging,
             // shown in the bottom bar, not baked into the curve.
             EQCurveView(
-                bands: state.preset.bands,
-                responseBands: state.preset.renderedBands,
+                bands: state.heardPreset.bands,
+                responseBands: state.heardPreset.renderedBands,
                 preampDB: 0,
-                interactive: true,
+                interactive: !state.hearingReference,
                 showSpectrum: state.isEnabled && state.editorIsVisible,
                 showIndividualCurves: true,
-                rangeDB: state.preset.displayRangeDB,
+                rangeDB: state.heardPreset.displayRangeDB,
                 selectedBandID: $selectedBandID,
                 onBandChange: { id, f, g in
                     guard let i = state.preset.bands.firstIndex(where: { $0.id == id }) else { return }
@@ -264,10 +245,14 @@ struct EditorView: View {
             .opacity(state.bypassed ? 0.45 : 1)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: state.bypassed)
             .overlay(alignment: .topLeading) {
-                Text("+\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
+                HStack(spacing: 10) {
+                    Text("+\(Int(state.heardPreset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary)
+                    referencePill.controlSize(.small)
+                }
+                .padding(4)
             }
             .overlay(alignment: .bottomLeading) {
-                Text("−\(Int(state.preset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
+                Text("−\(Int(state.heardPreset.displayRangeDB)) dB").font(.caption2).foregroundStyle(.secondary).padding(4)
             }
             .overlay(alignment: .bottomTrailing) {
                 if state.isEnabled && !state.bypassed {
@@ -277,6 +262,9 @@ struct EditorView: View {
             .overlay(alignment: .topTrailing) {
                 if state.bypassed {
                     Label("Bypassed", systemImage: "waveform.slash")
+                        .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
+                } else if state.hearingReference {
+                    Label("Hearing reference", systemImage: "ear")
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(4)
                 } else if bandLimitReached {
                     Text("32 bands maximum")
@@ -510,9 +498,9 @@ struct EditorView: View {
                     adjustRow("Tilt", value: $state.preset.adjustment.tiltDB, range: -6...6, step: 0.5,
                               actionName: "Change Tilt", format: Self.signedDecibels,
                               help: "Tips the whole response about 1 kHz: up brightens, down warms")
-                    adjustRow("Strength", value: strengthPercent, range: 0...100, step: 5,
-                              actionName: "Change Strength", format: Self.strengthPercentage,
-                              help: "How much of the preset's correction is applied")
+                    adjustRow("Strength", value: strengthPercent, range: 0...150, step: 5,
+                              actionName: "Change Strength", format: Self.strengthPercentage, warnAbove: 100,
+                              help: "How much of the preset's correction is applied. Above 100 % over-corrects.")
                 }
             }
             Spacer(minLength: 0)
@@ -547,7 +535,8 @@ struct EditorView: View {
     /// increment is finer than a step, so a key press moves one step in its
     /// direction rather than rounding back to where it was.
     private func adjustRow(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double,
-                           actionName: String, format: @escaping (Double) -> String, help: String) -> some View {
+                           actionName: String, format: @escaping (Double) -> String, warnAbove: Double? = nil,
+                           help: String) -> some View {
         HStack(spacing: 12) {
             Text(label)
                 .font(.subheadline)
@@ -588,6 +577,7 @@ struct EditorView: View {
             .accessibilityValue(format(value.wrappedValue))
             Text(format(value.wrappedValue))
                 .font(.subheadline.weight(.medium).monospacedDigit())
+                .foregroundStyle(warnAbove.map { value.wrappedValue > $0 } == true ? Color.orange : Color.primary)
                 .frame(width: 64, alignment: .trailing)
         }
         .help(help)

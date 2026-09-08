@@ -37,7 +37,7 @@ enum TestRunner {
             try adjustmentTests()
             bandColorTests()
             bandNudgeTests()
-            abUndoTests()
+            referenceTests()
             engineRenderTests()
             appStateTests()
             storeTests()
@@ -580,6 +580,8 @@ enum TestRunner {
         expect(preset.adjustment.isNeutral && preset.renderedBands == [band], "neutral adjustment renders the bands unchanged")
         preset.adjustment.strength = 0.5
         expect(near(preset.renderedBands[0].gain, 3) && preset.renderedBands.count == 1, "strength scales band gain")
+        preset.adjustment.strength = 1.5
+        expect(near(preset.renderedBands[0].gain, 9), "strength above one over-corrects")
         preset.adjustment = EQAdjustment(bassDB: 3, trebleDB: -2, tiltDB: 1)
         expect(preset.renderedBands.count == 5, "shelves and the tilt pair follow the bands")
 
@@ -704,54 +706,46 @@ enum TestRunner {
         expect(preset(4, 25).displayRangeDB == 30, "a 25 dB band widens to ±30")
     }
 
-    private static func abUndoTests() {
+    private static func referenceTests() {
         MainActor.assumeIsolated {
             AppState.screenshotMode = true
             let state = AppState.shared
             let undo = UndoManager()
             undo.groupsByEvent = false
             let a = EQPreset(name: "A", bands: [EQBand(type: .peak, frequency: 1000, gain: 3, q: 1)])
+            let b = EQPreset(name: "B", bands: [EQBand(type: .peak, frequency: 500, gain: -2, q: 1)])
+            state.setReference(nil)
             state.apply(a)
-            if state.abSlot != 0 { state.storeABAndSwitch(to: 0) }
-            expect(state.abSlot == 0, "test starts in slot A")
+            expect(state.heardPreset == a && !state.hearingReference, "with no reference the working preset is heard")
 
             undo.beginUndoGrouping()
-            state.storeABAndSwitch(to: 1, undoManager: undo)
+            state.setReference(b, undoManager: undo)
             undo.endUndoGrouping()
-            expect(state.abSlot == 1, "switching selects slot B")
-            expect(state.preset == a, "an empty B starts as a copy of A")
-            expect(state.abPreset(inSlot: 0) == a, "A holds the curve that was left")
-            expect(undo.undoActionName == "Switch A/B", "the switch is an undo step")
+            expect(state.reference == b && state.preset == a, "setting a reference leaves the edit alone")
+            expect(undo.undoActionName == "Set Reference", "setting a reference is a named undo step")
 
-            state.preset.bands[0].gain = -4
-            let b = state.preset
+            state.hearingReference = true
+            expect(state.heardPreset == b && state.preset == a, "hearing the reference renders it and keeps the edit")
+
             undo.beginUndoGrouping()
-            state.storeABAndSwitch(to: 0, undoManager: undo)
+            state.swapWithReference(undoManager: undo)
             undo.endUndoGrouping()
-            expect(state.preset == a, "switching back restores A")
-
+            expect(state.preset == b && state.reference == a && !state.hearingReference,
+                   "swap exchanges the two and returns to the edit")
             undo.undo()
-            expect(state.abSlot == 1 && state.preset == b, "undo returns to B with its edit")
+            expect(state.preset == a && state.reference == b, "undo puts the swap back")
             undo.redo()
-            expect(state.abSlot == 0 && state.preset == a, "redo goes to A again")
+            expect(state.preset == b && state.reference == a, "redo swaps again")
 
-            undo.removeAllActions()
-            state.storeABAndSwitch(to: 0, undoManager: undo)
-            expect(!undo.canUndo, "switching to the active slot registers nothing")
-
-            // Choosing a preset for a slot fills it and switches to it.
-            let c = EQPreset(name: "C", bands: [EQBand(type: .peak, frequency: 500, gain: 2, q: 1)])
+            state.hearingReference = true
             undo.beginUndoGrouping()
-            state.compare(with: c, inSlot: 1, undoManager: undo)
+            state.setReference(nil, undoManager: undo)
             undo.endUndoGrouping()
-            expect(state.abSlot == 1 && state.preset == c, "choosing a preset for B selects B holding it")
-            expect(state.abPreset(inSlot: 0) == a, "A keeps its curve as the reference")
-            expect(undo.undoActionName == "Compare with C", "the choice is one named undo step")
+            expect(state.reference == nil && !state.hearingReference && state.heardPreset == b,
+                   "clearing the reference stops hearing it")
             undo.undo()
-            expect(state.abSlot == 0 && state.preset == a && state.abPreset(inSlot: 1) == b,
-                   "undo restores the slot that was replaced")
-            state.preset.bands[0].gain = 9
-            expect(state.abSlotIsModified(0) == false, "an unsaved working preset is not marked edited")
+            expect(state.reference == a, "undo restores the cleared reference")
+            state.setReference(nil)
         }
     }
 

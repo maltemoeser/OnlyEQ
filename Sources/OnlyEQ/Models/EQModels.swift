@@ -116,7 +116,7 @@ struct EQAdjustment: Codable, Equatable {
     var trebleDB: Double = 0
     /// Gain at the treble end; the bass end gets the opposite sign.
     var tiltDB: Double = 0
-    /// 0 to 1: the fraction of each band's gain that is applied.
+    /// 0 to 1.5: the fraction of each band's gain that is applied; above 1 over-corrects.
     var strength: Double = 1
 
     static let neutral = EQAdjustment()
