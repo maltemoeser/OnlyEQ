@@ -47,7 +47,7 @@ enum ScreenshotRenderer {
                 panelRadius: PopoverView.cornerRadius, dark: dark))
 
             save("editor", canvas(
-                windowChrome(EditorView(inlineToolbar: true).environmentObject(state).frame(width: 840, height: 540),
+                windowChrome(EditorView(inlineToolbar: true).environmentObject(state).frame(width: 840, height: 596),
                              width: 840, inTitleBar: true),
                 panelRadius: 12, dark: dark))
 
