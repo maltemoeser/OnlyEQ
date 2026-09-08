@@ -126,10 +126,11 @@ final class AppState: ObservableObject {
     var effectivePreampDB: Double {
         guard autoPreampEnabled else { return preset.preampDB }
         let sampleRate = engine.processor.sampleRate
+        let rendered = preset.renderedBands
         if let cache = autoPreampCache,
-           cache.bands == preset.bands, cache.sampleRate == sampleRate { return cache.value }
-        let value = EQResponse.autoPreamp(bands: preset.bands, sampleRate: sampleRate)
-        autoPreampCache = (preset.bands, sampleRate, value)
+           cache.bands == rendered, cache.sampleRate == sampleRate { return cache.value }
+        let value = EQResponse.autoPreamp(bands: rendered, sampleRate: sampleRate)
+        autoPreampCache = (rendered, sampleRate, value)
         return value
     }
 
@@ -241,7 +242,7 @@ final class AppState: ObservableObject {
             : []
         let loudnessHeadroomDB = loudness.map(\.gain).max() ?? 0
         engine.processor.update(
-            bands: preset.bands + loudness,
+            bands: preset.renderedBands + loudness,
             preampDB: (overridePreampDB ?? effectivePreampDB) - loudnessHeadroomDB,
             outputGainDB: outputGainDB,
             limiterEnabled: limiterEnabled,

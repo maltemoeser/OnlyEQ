@@ -29,6 +29,11 @@ struct EditorView: View {
     @State private var handledInitialImport = false
     /// The preset as it was when a node drag began; one undo step per drag.
     @State private var dragStartPreset: EQPreset?
+    /// The preset as it was when an Adjust slider drag began.
+    @State private var adjustDragStart: EQPreset?
+    @AppStorage("editorStripMode") private var stripMode: StripMode = .bands
+
+    enum StripMode: String { case bands, adjust }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,7 +41,7 @@ struct EditorView: View {
             compareRow
             Divider()
             graph
-            bandStrip
+            if stripMode == .adjust { adjustPane } else { bandStrip }
             Divider()
             bottomBar
         }
@@ -238,6 +243,7 @@ struct EditorView: View {
             // shown in the bottom bar, not baked into the curve.
             EQCurveView(
                 bands: state.preset.bands,
+                responseBands: state.preset.renderedBands,
                 preampDB: 0,
                 interactive: true,
                 showSpectrum: state.isEnabled && state.editorIsVisible,
@@ -478,10 +484,104 @@ struct EditorView: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(1)
             Spacer()
+            Picker("Editing", selection: $stripMode) {
+                Text("Bands").tag(StripMode.bands)
+                Text("Adjust").tag(StripMode.adjust)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .help("Bands edits each filter. Adjust tunes the whole profile with Bass, Treble, Tilt, and Strength.")
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Adjust pane
+
+    /// The simple way to tune a profile: two shelves, a tilt, and how much of
+    /// the correction to apply, laid over the bands without touching them.
+    private var adjustPane: some View {
+        HStack(spacing: 24) {
+            VStack(spacing: 8) {
+                adjustRow("Bass", value: $state.preset.adjustment.bassDB, range: -6...6, step: 0.5,
+                          actionName: "Change Bass", format: Self.signedDecibels,
+                          help: "Low shelf at 105 Hz")
+                adjustRow("Treble", value: $state.preset.adjustment.trebleDB, range: -6...6, step: 0.5,
+                          actionName: "Change Treble", format: Self.signedDecibels,
+                          help: "High shelf at 2.5 kHz")
+                adjustRow("Tilt", value: $state.preset.adjustment.tiltDB, range: -6...6, step: 0.5,
+                          actionName: "Change Tilt", format: Self.signedDecibels,
+                          help: "Tips the whole response about 1 kHz: up brightens, down warms")
+                adjustRow("Strength", value: strengthPercent, range: 0...100, step: 5,
+                          actionName: "Change Strength", format: { String(format: "%.0f%%", $0) },
+                          help: "How much of the preset's correction is applied")
+            }
+            .frame(maxWidth: 520)
+            Spacer(minLength: 0)
+            Button("Reset") {
+                state.recordingUndo("Reset Adjustments", undoManager) { state.preset.adjustment = .neutral }
+            }
+            .disabled(state.preset.adjustment.isNeutral)
+            .help("Back to the preset as published")
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(height: Self.bandStripHeight)
+    }
+
+    private var strengthPercent: Binding<Double> {
+        Binding(get: { state.preset.adjustment.strength * 100 },
+                set: { state.preset.adjustment.strength = $0 / 100 })
+    }
+
+    private static func signedDecibels(_ value: Double) -> String {
+        value == 0 ? "0.0 dB" : String(format: "%+.1f dB", value)
+    }
+
+    /// A drag is one undo step, registered when the knob is released; a
+    /// keyboard step registers on its own.
+    private func adjustRow(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double,
+                           actionName: String, format: @escaping (Double) -> String, help: String) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 60, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { value.wrappedValue },
+                    set: { updated in
+                        let stepped = (updated / step).rounded() * step
+                        if adjustDragStart == nil {
+                            state.recordingUndo(actionName, undoManager) { value.wrappedValue = stepped }
+                        } else {
+                            value.wrappedValue = stepped
+                        }
+                    }
+                ),
+                in: range,
+                onEditingChanged: { editing in
+                    if editing {
+                        adjustDragStart = state.preset
+                    } else if let before = adjustDragStart {
+                        adjustDragStart = nil
+                        if before != state.preset {
+                            state.registerUndo(restoring: before, actionName: actionName, undoManager: undoManager)
+                        }
+                        state.flushWorkingPresetPersistence()
+                    }
+                }
+            )
+            .accessibilityLabel(label)
+            .accessibilityValue(format(value.wrappedValue))
+            Text(format(value.wrappedValue))
+                .font(.subheadline.weight(.medium).monospacedDigit())
+                .frame(width: 64, alignment: .leading)
+        }
+        .help(help)
     }
 
     private var clipIndicator: some View {

@@ -124,7 +124,7 @@ struct PopoverView: View {
             // The spectrum leads and the curve is a line over it. Bypass
             // settles the line onto 0 dB rather than blanking it: the one
             // authored moment, and it says what bypass does.
-            EQCurveView(bands: state.preset.bands, preampDB: 0,
+            EQCurveView(bands: state.preset.renderedBands, preampDB: 0,
                         showSpectrum: state.isEnabled && state.popoverIsVisible,
                         spectrumStyle: .live, curveStyle: .line,
                         rangeDB: state.preset.displayRangeDB,

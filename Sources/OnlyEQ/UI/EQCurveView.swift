@@ -34,12 +34,12 @@ private final class EQCurveResponseCache: ObservableObject {
     private var individualBands: [EQBand] = []
     private var individualResponses: [[Double]] = []
 
-    func data(bands: [EQBand], preampDB: Double, includeIndividuals: Bool) -> Data {
-        if bands != cachedBands || preampDB != cachedPreampDB {
-            cachedBands = bands
+    func data(bands: [EQBand], responseBands: [EQBand], preampDB: Double, includeIndividuals: Bool) -> Data {
+        if responseBands != cachedBands || preampDB != cachedPreampDB {
+            cachedBands = responseBands
             cachedPreampDB = preampDB
             cachedCombined = EQResponse.curve(
-                bands: bands, preampDB: preampDB, frequencies: Self.combinedFrequencies
+                bands: responseBands, preampDB: preampDB, frequencies: Self.combinedFrequencies
             )
         }
 
@@ -105,6 +105,10 @@ struct EQCurveView: View, Animatable {
     }
 
     var bands: [EQBand]
+    /// Bands behind the composite curve when they differ from `bands`: the
+    /// editor draws handles for the preset's bands but the curve of what is
+    /// heard, adjustment included.
+    var responseBands: [EQBand]?
     var preampDB: Double
     var interactive = false
     var showSpectrum = true
@@ -128,7 +132,7 @@ struct EQCurveView: View, Animatable {
         set { responseScale = newValue }
     }
 
-    init(bands: [EQBand], preampDB: Double, interactive: Bool = false, showSpectrum: Bool = true,
+    init(bands: [EQBand], responseBands: [EQBand]? = nil, preampDB: Double, interactive: Bool = false, showSpectrum: Bool = true,
          spectrumStyle: SpectrumStyle = .normal, curveStyle: CurveStyle = .filled,
          showIndividualCurves: Bool = false, rangeDB: Double = 12, responseScale: Double = 1,
          selectedBandID: Binding<UUID?> = .constant(nil),
@@ -136,6 +140,7 @@ struct EQCurveView: View, Animatable {
          onBandDragEnded: (() -> Void)? = nil,
          onAddBand: ((Double, Double) -> Void)? = nil) {
         self.bands = bands
+        self.responseBands = responseBands
         self.preampDB = preampDB
         self.interactive = interactive
         self.showSpectrum = showSpectrum
@@ -152,7 +157,8 @@ struct EQCurveView: View, Animatable {
 
     var body: some View {
         let responseData = responseCache.data(
-            bands: bands, preampDB: preampDB, includeIndividuals: showIndividualCurves
+            bands: bands, responseBands: responseBands ?? bands, preampDB: preampDB,
+            includeIndividuals: showIndividualCurves
         )
         GeometryReader { geo in
             let size = geo.size
