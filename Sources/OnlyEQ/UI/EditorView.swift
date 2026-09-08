@@ -156,6 +156,7 @@ struct EditorView: View {
             saveButton
             revertButton
             Spacer()
+            stripModePicker
             bypassToggle
             Spacer()
             importButton
@@ -173,11 +174,26 @@ struct EditorView: View {
             saveButton
             revertButton
         }
-        ToolbarItem(placement: .principal) { bypassToggle }
+        ToolbarItemGroup(placement: .principal) {
+            stripModePicker
+            bypassToggle
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             importButton
             AppGearMenu()
         }
+    }
+
+    /// The editor's two ways of working: every filter, or the whole profile.
+    private var stripModePicker: some View {
+        Picker("Editing", selection: $stripMode) {
+            Text("Bands").tag(StripMode.bands)
+            Text("Adjust").tag(StripMode.adjust)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("Bands edits each filter. Adjust tunes the whole profile with Bass, Treble, Tilt, and Strength.")
     }
 
     private var presetMenu: some View {
@@ -484,14 +500,6 @@ struct EditorView: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(1)
             Spacer()
-            Picker("Editing", selection: $stripMode) {
-                Text("Bands").tag(StripMode.bands)
-                Text("Adjust").tag(StripMode.adjust)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help("Bands edits each filter. Adjust tunes the whole profile with Bass, Treble, Tilt, and Strength.")
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
