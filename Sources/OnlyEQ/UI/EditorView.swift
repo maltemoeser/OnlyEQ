@@ -327,51 +327,79 @@ struct EditorView: View {
         return ordered
     }
 
+    /// Bands as rows in two or more columns, filled top to bottom then left
+    /// to right, so a ten-band preset shows whole with no scrolling. Longer
+    /// presets scroll vertically; wider windows add a column.
     private var bandStrip: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(Array(orderedBands.enumerated()), id: \.element.id) { index, band in
-                        BandCard(index: index, band: bandBinding(band.id),
-                                 isSelected: selectedBandID == band.id,
-                                 onDelete: { deleteBand(band.id) })
-                            .onTapGesture { selectedBandID = band.id }
-                            .focusable()
-                            .focused($focusedBandID, equals: band.id)
-                            .id(band.id)
-                    }
-                    addBandButton
+        GeometryReader { geo in
+            let usable = geo.size.width - 48 + Self.bandColumnSpacing
+            let columnCount = max(1, Int(usable / (Self.bandColumnMinWidth + Self.bandColumnSpacing)))
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    bandColumns(count: columnCount)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 8)
-            }
-            // Selecting a handle on the graph brings its card into view, so a
-            // 32-band preset never hides the card being edited.
-            .onChange(of: selectedBandID) { _, id in
-                guard let id else { return }
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                // Selecting a handle on the graph brings its row into view, so a
+                // 32-band preset never hides the row being edited.
+                .onChange(of: selectedBandID) { _, id in
+                    guard let id else { return }
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
+                }
             }
         }
-        .frame(height: 122)
+        .frame(height: Self.bandStripHeight)
     }
 
-    private var addBandButton: some View {
+    static let bandColumnMinWidth: CGFloat = 328
+    static let bandColumnSpacing: CGFloat = 12
+    /// Six 22 pt rows at 2 pt spacing plus 8 pt above and below: ten bands
+    /// and the add row in two columns.
+    static let bandStripHeight: CGFloat = 158
+
+    private func bandColumns(count: Int) -> some View {
+        let bands = orderedBands
+        let itemCount = bands.count + 1
+        let rows = Int((Double(itemCount) / Double(count)).rounded(.up))
+        return HStack(alignment: .top, spacing: Self.bandColumnSpacing) {
+            ForEach(0..<count, id: \.self) { column in
+                VStack(spacing: 2) {
+                    ForEach(column * rows..<min((column + 1) * rows, itemCount), id: \.self) { position in
+                        if position < bands.count {
+                            let band = bands[position]
+                            BandRow(index: position, band: bandBinding(band.id),
+                                    isSelected: selectedBandID == band.id,
+                                    onDelete: { deleteBand(band.id) })
+                                .onTapGesture { selectedBandID = band.id }
+                                .focusable()
+                                .focused($focusedBandID, equals: band.id)
+                                .id(band.id)
+                        } else {
+                            addBandRow
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var addBandRow: some View {
         Button {
             addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
         } label: {
-            Image(systemName: "plus")
-                .font(.title3)
-                .frame(width: 44, height: 100)
+            Label("Add Band", systemImage: "plus")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+                .frame(height: 22)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(bandLimitReached)
         .help(bandLimitReached ? "32 bands maximum" : "Add band")
         .accessibilityLabel("Add band")
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                .foregroundStyle(.tertiary)
-        )
     }
 
     private func bandBinding(_ id: UUID) -> Binding<EQBand> {
@@ -672,57 +700,56 @@ private final class PeakMeterNSView: NSView {
     }
 }
 
-/// Compact per-band card: color dot, type menu, Fc/Gain/Q fields, delete.
-struct BandCard: View {
+/// One band as a list row: colour dot, number, type menu, then frequency,
+/// gain, and Q as click-to-edit fields, and the delete glyph.
+struct BandRow: View {
     var index: Int
     @Binding var band: EQBand
     var isSelected: Bool
     var onDelete: () -> Void
 
+    private var color: Color { BandPalette.color(band.colorIndex ?? index) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
-                Circle().fill(BandPalette.color(band.colorIndex ?? index)).frame(width: 8, height: 8)
-                Text("\(index + 1)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Menu {
-                    ForEach(FilterType.allCases) { type in
-                        Button(type.displayName) { band.type = type }
-                    }
-                } label: {
-                    Text(band.type.displayName).font(.caption)
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text("\(index + 1)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .frame(width: 16, alignment: .trailing)
+            Menu {
+                ForEach(FilterType.allCases) { type in
+                    Button(type.displayName) { band.type = type }
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                Spacer(minLength: 0)
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption2.weight(.bold))
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
-                .help("Delete band")
-                .accessibilityLabel("Delete band")
+            } label: {
+                Text(band.type.displayName).font(.caption)
             }
-            valueRow("Fc", value: $band.frequency, range: 20...20000, format: freqFormat, parse: parseFreq)
-            valueRow("Gain", value: $band.gain, range: -30...30, format: { String(format: "%.1f dB", $0) },
-                     parse: { Double($0.replacingOccurrences(of: "dB", with: "").trimmingCharacters(in: .whitespaces)) })
-            valueRow("Q", value: $band.q, range: 0.1...30, format: { String(format: "%.2f", $0) }, parse: { Double($0) })
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .frame(width: 72, alignment: .leading)
+            Spacer(minLength: 4)
+            valueField("Frequency", value: $band.frequency, range: 20...20000, width: 60,
+                       format: freqFormat, parse: parseFreq)
+            valueField("Gain", value: $band.gain, range: -30...30, width: 58,
+                       format: { String(format: "%.1f dB", $0) },
+                       parse: { Double($0.replacingOccurrences(of: "dB", with: "").trimmingCharacters(in: .whitespaces)) })
+            valueField("Q", value: $band.q, range: 0.1...30, width: 50,
+                       format: { String(format: "Q %.2f", $0) },
+                       parse: { Double($0.lowercased().replacingOccurrences(of: "q", with: "").trimmingCharacters(in: .whitespaces)) })
+            Button {
+                onDelete()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.bold))
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tertiary)
+            .help("Delete band")
+            .accessibilityLabel("Delete band")
         }
-        .padding(8)
-        .frame(width: 150)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? BandPalette.color(band.colorIndex ?? index) : Color(nsColor: .separatorColor),
-                                      lineWidth: isSelected ? 1.5 : 1)
-                )
-        )
+        .padding(.horizontal, 4)
+        .frame(height: 22)
+        .background(RoundedRectangle(cornerRadius: 5).fill(isSelected ? color.opacity(0.18) : .clear))
         .opacity(band.isEnabled ? 1 : 0.5)
         .contextMenu {
             Button(band.isEnabled ? "Disable Band" : "Enable Band") { band.isEnabled.toggle() }
@@ -746,20 +773,18 @@ struct BandCard: View {
 
     /// Typed values are clamped to the same range the canvas drag allows, so a
     /// stray "0" cannot put a node at log10(0) or push gain off the graph.
-    private func valueRow(_ label: String, value: Binding<Double>, range: ClosedRange<Double>,
-                          format: @escaping (Double) -> String,
-                          parse: @escaping (String) -> Double?) -> some View {
-        HStack(spacing: 4) {
-            Text(label).font(.caption2).foregroundStyle(.secondary).frame(minWidth: 28, alignment: .leading)
-            // The draft carries the exact unitless value so a band shown as
-            // "1.5 kHz" edits as "1534", not "1.5" (which would parse as 1.5 Hz).
-            EditableValueField(label: label, text: format(value.wrappedValue),
-                               editText: String(format: "%g", value.wrappedValue)) { input in
-                if let parsed = parse(input), parsed.isFinite {
-                    value.wrappedValue = min(max(parsed, range.lowerBound), range.upperBound)
-                }
+    private func valueField(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, width: CGFloat,
+                            format: @escaping (Double) -> String,
+                            parse: @escaping (String) -> Double?) -> some View {
+        // The draft carries the exact unitless value so a band shown as
+        // "1.5 kHz" edits as "1534", not "1.5" (which would parse as 1.5 Hz).
+        EditableValueField(label: label, text: format(value.wrappedValue),
+                           editText: String(format: "%g", value.wrappedValue)) { input in
+            if let parsed = parse(input), parsed.isFinite {
+                value.wrappedValue = min(max(parsed, range.lowerBound), range.upperBound)
             }
         }
+        .frame(width: width)
     }
 }
 
