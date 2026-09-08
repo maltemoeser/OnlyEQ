@@ -606,6 +606,14 @@ enum TestRunner {
         let crowded = [100.0, 200, 400, 800, 1600, 3200, 6400, 12800].map { EQBand(frequency: $0) }
         expect(near(EQBand.openFrequency(among: crowded), 45, 1), "a crowded preset opens at its low end")
 
+        var hold = PeakHold()
+        hold.push(-12); hold.push(-2); hold.push(-20)
+        expect(hold.currentDB == -20 && hold.heldDB == -2, "the peak hold keeps the highest level")
+        hold.push(-80)
+        expect(hold.currentDB == -60, "the peak hold floors at -60 dBFS")
+        hold.reset()
+        expect(hold == PeakHold(), "resetting the peak hold clears both readings")
+
         MainActor.assumeIsolated {
             AppState.screenshotMode = true  // no engine, no persistence
             let state = AppState.shared

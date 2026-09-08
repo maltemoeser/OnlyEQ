@@ -489,10 +489,13 @@ struct EditorView: View {
                 .toggleStyle(.checkbox)
                 .fixedSize(horizontal: true, vertical: false)
                 .layoutPriority(2)
+            Spacer()
+            Text("Output")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
             clipIndicator
                 .fixedSize(horizontal: true, vertical: false)
-                .layoutPriority(1)
-            Spacer()
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
@@ -598,9 +601,12 @@ struct EditorView: View {
         .help(help)
     }
 
+    /// Output level after the limiter: the current peak, and the highest
+    /// since the editor opened so a brief clip is not missed.
     private var clipIndicator: some View {
         PeakMeterView(processor: state.engine.processor, isActive: state.editorIsVisible)
-            .frame(width: 78, height: 14)
+            .frame(width: 124, height: 14)
+            .help("Output peak after the limiter, and the highest since the editor opened. Click to reset.")
     }
 
     /// A stored custom preset, other than the one being edited, that the typed
@@ -683,8 +689,24 @@ private struct ManualPreampControl: View {
     }
 }
 
+/// The peak readout's memory: the latest peak and the highest since reset.
+struct PeakHold: Equatable {
+    private(set) var currentDB: Double = -60
+    private(set) var heldDB: Double = -60
+
+    mutating func push(_ db: Double) {
+        currentDB = max(db, -60)
+        heldDB = max(heldDB, currentDB)
+    }
+
+    mutating func reset() {
+        currentDB = -60
+        heldDB = -60
+    }
+}
+
 /// Keeps the display-linked peak readout out of SwiftUI's view graph. Updating this
-/// AppKit view redraws only its 78×14-point bounds instead of the editor.
+/// AppKit view redraws only its 124×14-point bounds instead of the editor.
 private struct PeakMeterView: NSViewRepresentable {
     let processor: EQProcessor
     let isActive: Bool
@@ -711,7 +733,7 @@ private final class PeakMeterNSView: NSView {
     private let textLayer = CATextLayer()
     private var animationLink: CADisplayLink?
     private var active = false
-    private var db: Double = -60
+    private var hold = PeakHold()
     private var renderedLabel = ""
     private var renderedColor: NSColor?
 
@@ -728,7 +750,16 @@ private final class PeakMeterNSView: NSView {
         textLayer.alignmentMode = .left
         layer?.addSublayer(dotLayer)
         layer?.addSublayer(textLayer)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityLabel("Output peak")
         updateLayers(force: true)
+    }
+
+    /// A click clears the held peak, so the next listen starts clean.
+    override func mouseDown(with event: NSEvent) {
+        hold.reset()
+        updateLayers()
     }
 
     required init?(coder: NSCoder) {
@@ -755,7 +786,7 @@ private final class PeakMeterNSView: NSView {
             startAnimating()
         } else {
             stopAnimating()
-            db = -60
+            hold.reset()
             updateLayers(force: true)
         }
     }
@@ -765,12 +796,16 @@ private final class PeakMeterNSView: NSView {
         if active, window != nil { startAnimating() } else { stopAnimating() }
     }
 
+    /// The dot follows the held peak, so a clip that passed in a moment
+    /// stays visible until the meter is reset.
     private func updateLayers(force: Bool = false) {
-        let color: NSColor = db > -0.1 ? .systemRed : (db > -3 ? .systemOrange : .systemGreen)
-        let label = String(format: "%.1f dBFS", max(db, -60))
+        let held = hold.heldDB
+        let color: NSColor = held > -0.1 ? .systemRed : (held > -3 ? .systemOrange : .systemGreen)
+        let label = String(format: "%.1f dBFS  max %.1f", hold.currentDB, held)
         guard force || label != renderedLabel || color != renderedColor else { return }
         renderedLabel = label
         renderedColor = color
+        setAccessibilityValue(label)
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -805,7 +840,7 @@ private final class PeakMeterNSView: NSView {
 
     @objc private func samplePeak(_ link: CADisplayLink) {
         let peak = processor.currentPeak
-        db = peak > 0 ? 20 * log10(Double(peak)) : -60
+        hold.push(peak > 0 ? 20 * log10(Double(peak)) : -60)
         updateLayers()
     }
 
