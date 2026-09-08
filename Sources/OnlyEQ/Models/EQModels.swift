@@ -94,24 +94,65 @@ struct EQBand: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
+/// A listener's taste laid over a preset's correction bands: a bass shelf,
+/// a treble shelf, a tilt about 1 kHz, and how much of the correction to
+/// apply. Saved with the preset but kept apart from its bands, so the
+/// imported filters stay as they were published.
+struct EQAdjustment: Codable, Equatable {
+    var bassDB: Double = 0
+    var trebleDB: Double = 0
+    /// Gain at the treble end; the bass end gets the opposite sign.
+    var tiltDB: Double = 0
+    /// 0 to 1: the fraction of each band's gain that is applied.
+    var strength: Double = 1
+
+    static let neutral = EQAdjustment()
+    var isNeutral: Bool { self == .neutral }
+
+    static let bassFrequency = 105.0
+    static let trebleFrequency = 2500.0
+    static let shelfQ = 0.71
+    static let tiltPivot = 1000.0
+    static let tiltQ = 0.5
+
+    /// The shelves as filters, appended after the preset's own bands.
+    var bands: [EQBand] {
+        var result: [EQBand] = []
+        if bassDB != 0 {
+            result.append(EQBand(type: .lowShelf, frequency: Self.bassFrequency, gain: bassDB, q: Self.shelfQ))
+        }
+        if trebleDB != 0 {
+            result.append(EQBand(type: .highShelf, frequency: Self.trebleFrequency, gain: trebleDB, q: Self.shelfQ))
+        }
+        if tiltDB != 0 {
+            result.append(EQBand(type: .lowShelf, frequency: Self.tiltPivot, gain: -tiltDB, q: Self.tiltQ))
+            result.append(EQBand(type: .highShelf, frequency: Self.tiltPivot, gain: tiltDB, q: Self.tiltQ))
+        }
+        return result
+    }
+}
+
 struct EQPreset: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
     var preampDB: Double = 0
     var bands: [EQBand] = [] { didSet { assignBandColors() } }
+    var adjustment = EQAdjustment.neutral
     /// Where the preset came from, e.g. "AutoEq parametric", "peqdb", "Imported file".
     var source: String?
 
-    init(id: UUID = UUID(), name: String, preampDB: Double = 0, bands: [EQBand] = [], source: String? = nil) {
+    init(id: UUID = UUID(), name: String, preampDB: Double = 0, bands: [EQBand] = [],
+         adjustment: EQAdjustment = .neutral, source: String? = nil) {
         self.id = id
         self.name = name
         self.preampDB = preampDB
         self.bands = bands
+        self.adjustment = adjustment
         self.source = source
         assignBandColors()
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name, preampDB, bands, source }
+    private enum CodingKeys: String, CodingKey { case id, name, preampDB, bands, adjustment, source }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -119,8 +160,20 @@ struct EQPreset: Identifiable, Codable, Equatable {
         name = try c.decode(String.self, forKey: .name)
         preampDB = try c.decodeIfPresent(Double.self, forKey: .preampDB) ?? 0
         bands = try c.decodeIfPresent([EQBand].self, forKey: .bands) ?? []
+        adjustment = try c.decodeIfPresent(EQAdjustment.self, forKey: .adjustment) ?? .neutral
         source = try c.decodeIfPresent(String.self, forKey: .source)
         assignBandColors()
+    }
+
+    /// What the processor runs and the composite curve shows: the bands with
+    /// their gains scaled by strength, then the adjustment's shelves.
+    var renderedBands: [EQBand] {
+        let scaled = adjustment.strength == 1 ? bands : bands.map { band in
+            var band = band
+            band.gain *= adjustment.strength
+            return band
+        }
+        return scaled + adjustment.bands
     }
 
     /// Gives every band without a palette slot the lowest one no other band
@@ -157,7 +210,7 @@ struct EQPreset: Identifiable, Codable, Equatable {
         ], source: "Built-in"),
     ]
 
-    var isFlat: Bool { bands.allSatisfy { $0.gain == 0 } && preampDB == 0 }
+    var isFlat: Bool { renderedBands.allSatisfy { $0.gain == 0 } && preampDB == 0 }
 
     /// Half-height of the curve display in dB: ±12 by default, widened in 6 dB
     /// steps so an imported band beyond ±12 dB is drawn where it is instead

@@ -34,6 +34,7 @@ enum TestRunner {
             undoTests()
             windowUndoRoutingTests()
             displayRangeTests()
+            try adjustmentTests()
             bandColorTests()
             bandNudgeTests()
             abUndoTests()
@@ -567,6 +568,57 @@ enum TestRunner {
             state.store.delete(saved)
             state.apply(.flat)
             expect(!state.presetIsModified, "built-in preset with no edits is not modified")
+        }
+    }
+
+    /// The adjustment renders as shelves after the strength-scaled bands,
+    /// decodes as neutral from presets saved before it existed, and counts as
+    /// a preset edit for modified, revert, and undo.
+    private static func adjustmentTests() throws {
+        let band = EQBand(type: .peak, frequency: 1000, gain: 6, q: 1.41)
+        var preset = EQPreset(name: "Adjust", bands: [band])
+        expect(preset.adjustment.isNeutral && preset.renderedBands == [band], "neutral adjustment renders the bands unchanged")
+        preset.adjustment.strength = 0.5
+        expect(near(preset.renderedBands[0].gain, 3) && preset.renderedBands.count == 1, "strength scales band gain")
+        preset.adjustment = EQAdjustment(bassDB: 3, trebleDB: -2, tiltDB: 1)
+        expect(preset.renderedBands.count == 5, "shelves and the tilt pair follow the bands")
+
+        let grid = [20.0, 40, 1000, 16000, 20000]
+        let bass = EQResponse.curve(bands: EQAdjustment(bassDB: 3).bands, preampDB: 0, frequencies: grid)
+        expect(near(bass[1], 3, 0.3) && near(bass[2], 0, 0.3) && near(bass[3], 0, 0.1), "bass shelf lifts the lows only")
+        let treble = EQResponse.curve(bands: EQAdjustment(trebleDB: 3).bands, preampDB: 0, frequencies: grid)
+        expect(near(treble[1], 0, 0.1) && near(treble[3], 3, 0.3), "treble shelf lifts the highs only")
+        let tilt = EQResponse.curve(bands: EQAdjustment(tiltDB: 3).bands, preampDB: 0, frequencies: grid)
+        expect(near(tilt[0], -3, 0.5) && near(tilt[2], 0, 0.2) && near(tilt[4], 3, 0.5), "tilt pivots at 1 kHz")
+        expect(EQResponse.autoPreamp(bands: EQAdjustment(bassDB: 3).bands) < -2.5, "auto preamp sees the adjustment")
+
+        let encoded = try JSONEncoder().encode(preset)
+        let decoded = try JSONDecoder().decode(EQPreset.self, from: encoded)
+        expect(decoded.adjustment == preset.adjustment, "adjustment round-trips through JSON")
+        let legacy = #"{"id":"6F6C7945-5100-4000-8000-000000000009","name":"Old","bands":[]}"#
+        let old = try JSONDecoder().decode(EQPreset.self, from: Data(legacy.utf8))
+        expect(old.adjustment.isNeutral, "a preset saved without an adjustment decodes as neutral")
+
+        MainActor.assumeIsolated {
+            AppState.screenshotMode = true  // no engine, no persistence
+            let state = AppState.shared
+            let saved = state.store.save(EQPreset(name: "Adjust Revert", bands: [band]))
+            state.apply(saved)
+            let undo = UndoManager()
+            undo.groupsByEvent = false
+            undo.beginUndoGrouping()
+            state.recordingUndo("Change Bass", undo) { state.preset.adjustment.bassDB = 2 }
+            undo.endUndoGrouping()
+            expect(state.presetIsModified, "an adjustment marks the preset modified")
+            expect(near(state.effectivePreampDB, EQResponse.autoPreamp(bands: state.preset.renderedBands), 0.01),
+                   "effective preamp covers the adjustment")
+            undo.undo()
+            expect(state.preset.adjustment.isNeutral, "undo restores the adjustment")
+            state.preset.adjustment.tiltDB = 1
+            state.revertPreset()
+            expect(state.preset.adjustment.isNeutral, "revert restores the stored adjustment")
+            state.store.delete(saved)
+            state.apply(.flat)
         }
     }
 

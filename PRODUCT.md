@@ -33,6 +33,7 @@ Uses the macOS 14.4 process-tap API instead of a virtual audio driver, so volume
 
 - Filter types: peak, low/high shelf, low/high pass, notch, band pass; band count uncapped in principle, 32 in the editor.
 - Preamp with Auto mode, output boost to 200 %, stereo-linked limiter, A/B slots, bypass that keeps preamp and limiter so A/B is level-matched.
+- Adjust layer per preset (Bass and Treble shelves, Tilt, Strength) rendered after the bands, for tuning an imported correction without editing it.
 - Realtime constraint: the IO callback must not allocate; filter changes swap atomically.
 - Terminology the app uses: Bypass (not Flat), Preamp, Boost, Crossfeed, Loudness compensation, Reference volume, Fc / Gain / Q.
 - Latency about 10 ms at the default 256-frame buffer; an exclude list handles DAWs and conferencing apps.

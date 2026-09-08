@@ -84,8 +84,14 @@ struct GeneralSettings: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
+                LabeledContent("Based on") {
+                    Link("OnlyEQ by zollans", destination: URL(string: "https://github.com/zollans/OnlyEQ")!)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("About")
+            } footer: {
+                Text("This is an independent fork with its own releases and update feed.")
             }
         }
         .formStyle(.grouped)
