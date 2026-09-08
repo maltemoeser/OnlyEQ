@@ -106,9 +106,17 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(autoSuggestHeadphoneProfiles, forKey: "autoSuggestHeadphoneProfiles") }
     }
 
-    /// A/B comparison slots.
-    @Published var abSlot: Int = 0
-    private var abPresets: [EQPreset?] = [nil, nil]
+    /// A curve kept aside to listen against. Read-only until swapped in.
+    @Published private(set) var reference: EQPreset? {
+        didSet { if hearingReference { pushToProcessor() } }
+    }
+    /// While true the reference plays instead of the working preset, which
+    /// stays untouched. A listening state, like Bypass, so not undoable.
+    @Published var hearingReference = false { didSet { pushToProcessor() } }
+
+    /// What the processor renders: the reference while it is heard,
+    /// otherwise the working preset.
+    var heardPreset: EQPreset { hearingReference ? (reference ?? preset) : preset }
 
     /// Set when the current preset was auto-applied by a device profile.
     @Published private(set) var presetWasAutoApplied = false
@@ -124,9 +132,9 @@ final class AppState: ObservableObject {
     private var autoPreampCache: (bands: [EQBand], sampleRate: Double, value: Double)?
 
     var effectivePreampDB: Double {
-        guard autoPreampEnabled else { return preset.preampDB }
+        guard autoPreampEnabled else { return heardPreset.preampDB }
         let sampleRate = engine.processor.sampleRate
-        let rendered = preset.renderedBands
+        let rendered = heardPreset.renderedBands
         if let cache = autoPreampCache,
            cache.bands == rendered, cache.sampleRate == sampleRate { return cache.value }
         let value = EQResponse.autoPreamp(bands: rendered, sampleRate: sampleRate)
@@ -242,7 +250,7 @@ final class AppState: ObservableObject {
             : []
         let loudnessHeadroomDB = loudness.map(\.gain).max() ?? 0
         engine.processor.update(
-            bands: preset.renderedBands + loudness,
+            bands: heardPreset.renderedBands + loudness,
             preampDB: (overridePreampDB ?? effectivePreampDB) - loudnessHeadroomDB,
             outputGainDB: outputGainDB,
             limiterEnabled: limiterEnabled,
@@ -629,60 +637,47 @@ final class AppState: ObservableObject {
         undoManager.setActionName(actionName)
     }
 
-    // MARK: - A/B
+    // MARK: - Reference
 
-    /// The curve a slot holds: the working preset for the selected slot, the
-    /// stored copy for the other, nil while the other slot is still empty.
-    func abPreset(inSlot slot: Int) -> EQPreset? {
-        slot == abSlot ? preset : abPresets[slot]
-    }
-
-    /// True when the curve in `slot` differs from the stored preset it came from.
-    func abSlotIsModified(_ slot: Int) -> Bool {
-        guard let held = abPreset(inSlot: slot),
-              let saved = store.allPresets.first(where: { $0.id == held.id }) else { return false }
-        return saved != held
-    }
-
-    private struct ABSnapshot {
+    private struct ReferenceSnapshot {
         var preset: EQPreset
-        var slot: Int
-        var slots: [EQPreset?]
+        var reference: EQPreset?
     }
 
-    private var abSnapshot: ABSnapshot { ABSnapshot(preset: preset, slot: abSlot, slots: abPresets) }
+    private var referenceSnapshot: ReferenceSnapshot { ReferenceSnapshot(preset: preset, reference: reference) }
 
-    /// Stores the current curve in the active slot and switches to `slot`.
-    /// The switch is one undo step that also puts the slots back.
-    func storeABAndSwitch(to slot: Int, undoManager: UndoManager? = nil) {
-        guard slot != abSlot else { return }
-        let before = abSnapshot
-        abPresets[abSlot] = preset
-        abSlot = slot
-        if let other = abPresets[slot] { preset = other }
-        registerABUndo(restoring: before, undoManager: undoManager)
+    /// Keeps `newReference` aside to listen against, or clears it with nil.
+    /// One named undo step; clearing also stops hearing it.
+    func setReference(_ newReference: EQPreset?, undoManager: UndoManager? = nil) {
+        let before = referenceSnapshot
+        if newReference == nil { hearingReference = false }
+        reference = newReference
+        registerReferenceUndo(restoring: before,
+                              actionName: newReference == nil ? "Clear Reference" : "Set Reference",
+                              undoManager: undoManager)
     }
 
-    /// Puts `newPreset` in `slot` and switches to it, keeping the other slot
-    /// as the reference. One undo step.
-    func compare(with newPreset: EQPreset, inSlot slot: Int, undoManager: UndoManager? = nil) {
-        let before = abSnapshot
-        abPresets[abSlot] = preset
-        abSlot = slot
-        apply(newPreset)
-        registerABUndo(restoring: before, actionName: "Compare with \(newPreset.name)", undoManager: undoManager)
+    /// Exchanges the working preset and the reference, so the reference
+    /// can be edited and the edit kept aside. One undo step.
+    func swapWithReference(undoManager: UndoManager? = nil) {
+        guard let held = reference else { return }
+        let before = referenceSnapshot
+        hearingReference = false
+        reference = preset
+        preset = held
+        registerReferenceUndo(restoring: before, actionName: "Swap with Reference", undoManager: undoManager)
     }
 
-    private func registerABUndo(restoring snapshot: ABSnapshot, actionName: String = "Switch A/B",
-                                undoManager: UndoManager?) {
+    private func registerReferenceUndo(restoring snapshot: ReferenceSnapshot, actionName: String,
+                                       undoManager: UndoManager?) {
         guard let undoManager else { return }
         undoManager.registerUndo(withTarget: self) { state in
-            let current = state.abSnapshot
-            state.abPresets = snapshot.slots
-            state.abSlot = snapshot.slot
+            let current = state.referenceSnapshot
+            if snapshot.reference == nil { state.hearingReference = false }
+            state.reference = snapshot.reference
             state.preset = snapshot.preset
             state.flushWorkingPresetPersistence()
-            state.registerABUndo(restoring: current, actionName: actionName, undoManager: undoManager)
+            state.registerReferenceUndo(restoring: current, actionName: actionName, undoManager: undoManager)
         }
         undoManager.setActionName(actionName)
     }
