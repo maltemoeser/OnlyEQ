@@ -139,7 +139,6 @@ struct EditorView: View {
             Spacer()
             saveButton
             revertButton
-            bypassToggle
             AppGearMenu()
         }
         .padding(.leading, Self.toolbarLeadingInset)
@@ -154,7 +153,6 @@ struct EditorView: View {
             revertButton
         }
         ToolbarItemGroup(placement: .primaryAction) {
-            bypassToggle
             AppGearMenu()
         }
     }
@@ -218,9 +216,14 @@ struct EditorView: View {
         .accessibilityLabel("Revert to saved preset")
     }
 
-    private var bypassToggle: some View {
+    /// Bypass lives on the plot as a capsule beside the reference pill, kin
+    /// to the popover's: both are listening states, not edits.
+    private var bypassPill: some View {
         Toggle("Bypass", isOn: $state.bypassed)
             .toggleStyle(.button)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .font(.caption)
             .keyboardShortcut("b", modifiers: .command)
             .help("Hear the unprocessed signal without changing the preset (⌘B)")
     }
@@ -272,20 +275,19 @@ struct EditorView: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                // The pill itself shows the hearing state, so no label repeats it.
+                // The pills show their own state, so no label repeats it.
                 HStack(spacing: 10) {
-                    if state.bypassed {
-                        Label("Bypassed", systemImage: "waveform.slash")
-                            .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    } else if bandLimitReached {
+                    if bandLimitReached {
                         Text("32 bands maximum")
                             .font(.caption).foregroundStyle(.secondary)
                     } else if state.preset.bands.isEmpty {
                         Label("Double-click graph to add band", systemImage: "plus.circle")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    referencePill.controlSize(.small)
+                    bypassPill
+                    referencePill
                 }
+                .controlSize(.small)
                 .padding(4)
             }
             FrequencyAxisLabels()
