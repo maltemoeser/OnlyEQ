@@ -22,7 +22,7 @@ Or build from source. It takes about a minute and needs only the Xcode Command L
 
 ```sh
 git clone https://github.com/maltemoeser/OnlyEQ && cd OnlyEQ
-./scripts/build-app.sh && cp -R build/OnlyEQ.app /Applications/
+./scripts/build-app.sh release && cp -R build/OnlyEQ.app /Applications/
 ```
 
 After that, OnlyEQ checks for signed updates and installs them in the background. See [RELEASING.md](RELEASING.md) for how releases are built.
