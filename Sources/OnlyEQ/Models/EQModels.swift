@@ -57,6 +57,19 @@ struct EQBand: Identifiable, Codable, Equatable, Hashable {
             && lhs.q == rhs.q && lhs.isEnabled == rhs.isEnabled
     }
 
+    /// Where a new band lands: the centre of the widest gap between the
+    /// existing bands on the log-frequency axis, so it never stacks on a
+    /// neighbour. 1 kHz for an empty preset.
+    static func openFrequency(among bands: [EQBand]) -> Double {
+        guard !bands.isEmpty else { return 1000 }
+        let edges = ([20.0, 20000] + bands.map { min(max($0.frequency, 20), 20000) }).map(log10).sorted()
+        var best = (width: 0.0, centre: 3.0)
+        for (low, high) in zip(edges, edges.dropFirst()) where high - low > best.width {
+            best = (high - low, (low + high) / 2)
+        }
+        return (pow(10, best.centre)).rounded()
+    }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(type)
         hasher.combine(frequency)

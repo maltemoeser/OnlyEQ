@@ -86,7 +86,6 @@ struct GeneralSettings: View {
                 }
                 LabeledContent("Based on") {
                     Link("OnlyEQ by zollans", destination: URL(string: "https://github.com/zollans/OnlyEQ")!)
-                        .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("About")

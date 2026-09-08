@@ -401,7 +401,7 @@ struct EditorView: View {
 
     private var addBandRow: some View {
         Button {
-            addBand(EQBand(type: .peak, frequency: 1000, gain: 0, q: 1.41))
+            addBand(EQBand(type: .peak, frequency: EQBand.openFrequency(among: state.preset.bands), gain: 0, q: 1.41))
         } label: {
             Label("Add Band", systemImage: "plus")
                 .font(.caption)
@@ -413,7 +413,7 @@ struct EditorView: View {
         }
         .buttonStyle(.plain)
         .disabled(bandLimitReached)
-        .help(bandLimitReached ? "32 bands maximum" : "Add band")
+        .help(bandLimitReached ? "32 bands maximum" : "Add a band in the widest gap between bands")
         .accessibilityLabel("Add band")
     }
 
@@ -516,16 +516,16 @@ struct EditorView: View {
                           actionName: "Change Tilt", format: Self.signedDecibels,
                           help: "Tips the whole response about 1 kHz: up brightens, down warms")
                 adjustRow("Strength", value: strengthPercent, range: 0...100, step: 5,
-                          actionName: "Change Strength", format: { String(format: "%.0f%%", $0) },
+                          actionName: "Change Strength", format: Self.strengthPercentage,
                           help: "How much of the preset's correction is applied")
             }
             .frame(maxWidth: 520)
-            Spacer(minLength: 0)
             Button("Reset") {
                 state.recordingUndo("Reset Adjustments", undoManager) { state.preset.adjustment = .neutral }
             }
             .disabled(state.preset.adjustment.isNeutral)
             .help("Back to the preset as published")
+            Spacer(minLength: 0)
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
@@ -542,8 +542,16 @@ struct EditorView: View {
         value == 0 ? "0.0 dB" : String(format: "%+.1f dB", value)
     }
 
+    /// Reads "Off" at zero, like the boost fader, since none of the bands
+    /// are heard.
+    private static func strengthPercentage(_ value: Double) -> String {
+        value == 0 ? "Off" : String(format: "%.0f%%", value)
+    }
+
     /// A drag is one undo step, registered when the knob is released; a
-    /// keyboard step registers on its own.
+    /// keyboard step registers on its own. The slider's own keyboard
+    /// increment is finer than a step, so a key press moves one step in its
+    /// direction rather than rounding back to where it was.
     private func adjustRow(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double,
                            actionName: String, format: @escaping (Double) -> String, help: String) -> some View {
         HStack(spacing: 12) {
@@ -555,7 +563,12 @@ struct EditorView: View {
                 value: Binding(
                     get: { value.wrappedValue },
                     set: { updated in
-                        let stepped = (updated / step).rounded() * step
+                        let current = value.wrappedValue
+                        var stepped = (updated / step).rounded() * step
+                        if adjustDragStart == nil, stepped == current, updated != current {
+                            stepped = current + (updated > current ? step : -step)
+                        }
+                        stepped = min(max(stepped, range.lowerBound), range.upperBound)
                         if adjustDragStart == nil {
                             state.recordingUndo(actionName, undoManager) { value.wrappedValue = stepped }
                         } else {
@@ -580,7 +593,7 @@ struct EditorView: View {
             .accessibilityValue(format(value.wrappedValue))
             Text(format(value.wrappedValue))
                 .font(.subheadline.weight(.medium).monospacedDigit())
-                .frame(width: 64, alignment: .leading)
+                .frame(width: 64, alignment: .trailing)
         }
         .help(help)
     }
