@@ -157,9 +157,8 @@ struct EditorView: View {
             revertButton
             Spacer()
             stripModePicker
-            bypassToggle
             Spacer()
-            importButton
+            bypassToggle
             AppGearMenu()
         }
         .padding(.leading, Self.toolbarLeadingInset)
@@ -174,12 +173,9 @@ struct EditorView: View {
             saveButton
             revertButton
         }
-        ToolbarItemGroup(placement: .principal) {
-            stripModePicker
-            bypassToggle
-        }
+        ToolbarItem(placement: .principal) { stripModePicker }
         ToolbarItemGroup(placement: .primaryAction) {
-            importButton
+            bypassToggle
             AppGearMenu()
         }
     }
@@ -202,6 +198,10 @@ struct EditorView: View {
                 Button(preset.name) {
                     state.recordingUndo("Switch Preset", undoManager) { state.apply(preset) }
                 }
+            }
+            Divider()
+            Button("Import…") {
+                importPresentation = ImportPresentation(profileSuggestion: nil)
             }
             if let stored = state.savedPreset, state.store.customPresets.contains(stored) {
                 Divider()
@@ -242,13 +242,6 @@ struct EditorView: View {
             .toggleStyle(.button)
             .keyboardShortcut("b", modifiers: .command)
             .help("Hear the unprocessed signal without changing the preset (⌘B)")
-    }
-
-    private var importButton: some View {
-        Button("Import…") {
-            importPresentation = ImportPresentation(profileSuggestion: nil)
-        }
-        .help("Import a preset from a file, text, or the online databases")
     }
 
     // MARK: - Graph
