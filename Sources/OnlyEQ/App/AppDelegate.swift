@@ -278,12 +278,12 @@ final class WindowManager {
         let isCreatingWindow = editorWindow == nil
         if editorWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 840, height: 616),
+                contentRect: NSRect(x: 0, y: 0, width: 840, height: 680),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
                 backing: .buffered, defer: false
             )
             window.title = "Equalizer"
-            window.minSize = NSSize(width: 720, height: 536)
+            window.minSize = NSSize(width: 720, height: 580)
             window.isReleasedWhenClosed = false
             // EditorView supplies the toolbar items; the preset menu stands
             // where a document title would, so the title itself stays hidden.

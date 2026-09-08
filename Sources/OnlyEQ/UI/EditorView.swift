@@ -483,7 +483,7 @@ struct EditorView: View {
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Adjust bar
@@ -497,7 +497,7 @@ struct EditorView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: true, vertical: false)
-            Grid(horizontalSpacing: 24, verticalSpacing: 6) {
+            Grid(horizontalSpacing: 40, verticalSpacing: 8) {
                 GridRow {
                     adjustRow("Bass", value: $state.preset.adjustment.bassDB, range: -6...6, step: 0.5,
                               actionName: "Change Bass", format: Self.signedDecibels,
@@ -515,6 +515,7 @@ struct EditorView: View {
                               help: "How much of the preset's correction is applied")
                 }
             }
+            Spacer(minLength: 0)
             Button("Reset") {
                 state.recordingUndo("Reset Adjustments", undoManager) { state.preset.adjustment = .neutral }
             }
@@ -523,7 +524,7 @@ struct EditorView: View {
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
     }
 
     private var strengthPercent: Binding<Double> {
@@ -532,7 +533,7 @@ struct EditorView: View {
     }
 
     private static func signedDecibels(_ value: Double) -> String {
-        value == 0 ? "0.0 dB" : String(format: "%+.1f dB", value)
+        value == 0 ? "0.0 dB" : typographic(String(format: "%+.1f dB", value))
     }
 
     /// Reads "Off" at zero, like the boost fader, since none of the bands
@@ -582,6 +583,7 @@ struct EditorView: View {
                     }
                 }
             )
+            .frame(maxWidth: 220)
             .accessibilityLabel(label)
             .accessibilityValue(format(value.wrappedValue))
             Text(format(value.wrappedValue))
@@ -645,7 +647,7 @@ private struct ManualPreampControl: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(String(format: "%.1f dB", trackedValue ?? effectiveValue))
+            Text(typographic(String(format: "%.1f dB", trackedValue ?? effectiveValue)))
                 .font(.subheadline.weight(.medium).monospacedDigit())
                 .foregroundStyle(isDisabled ? .secondary : .primary)
                 .frame(minWidth: 52, alignment: .trailing)
@@ -677,6 +679,11 @@ private struct ManualPreampControl: View {
         value = trackedValue
         self.trackedValue = nil
     }
+}
+
+/// Readouts use the true minus sign, like the axis labels, not a hyphen.
+fileprivate func typographic(_ readout: String) -> String {
+    readout.replacingOccurrences(of: "-", with: "−")
 }
 
 /// The peak readout's memory: the latest peak and the highest since reset.
@@ -791,7 +798,7 @@ private final class PeakMeterNSView: NSView {
     private func updateLayers(force: Bool = false) {
         let held = hold.heldDB
         let color: NSColor = held > -0.1 ? .systemRed : (held > -3 ? .systemOrange : .systemGreen)
-        let label = String(format: "%.1f dBFS  max %.1f", hold.currentDB, held)
+        let label = typographic(String(format: "%.1f dBFS  max %.1f", hold.currentDB, held))
         guard force || label != renderedLabel || color != renderedColor else { return }
         renderedLabel = label
         renderedColor = color
@@ -868,8 +875,9 @@ struct BandRow: View {
             valueField("Frequency", value: $band.frequency, range: 20...20000, width: 60,
                        format: freqFormat, parse: parseFreq)
             valueField("Gain", value: $band.gain, range: -30...30, width: 58,
-                       format: { String(format: "%.1f dB", $0) },
-                       parse: { Double($0.replacingOccurrences(of: "dB", with: "").trimmingCharacters(in: .whitespaces)) })
+                       format: { typographic(String(format: "%.1f dB", $0)) },
+                       parse: { Double($0.replacingOccurrences(of: "dB", with: "").replacingOccurrences(of: "−", with: "-")
+                                    .trimmingCharacters(in: .whitespaces)) })
             valueField("Q", value: $band.q, range: 0.1...30, width: 50,
                        format: { String(format: "Q %.2f", $0) },
                        parse: { Double($0.lowercased().replacingOccurrences(of: "q", with: "").trimmingCharacters(in: .whitespaces)) })
