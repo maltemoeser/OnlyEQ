@@ -31,9 +31,6 @@ struct EditorView: View {
     @State private var dragStartPreset: EQPreset?
     /// The preset as it was when an Adjust slider drag began.
     @State private var adjustDragStart: EQPreset?
-    @AppStorage("editorStripMode") private var stripMode: StripMode = .bands
-
-    enum StripMode: String { case bands, adjust }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,7 +38,9 @@ struct EditorView: View {
             compareRow
             Divider()
             graph
-            if stripMode == .adjust { adjustPane } else { bandStrip }
+            bandStrip
+            Divider()
+            adjustBar
             Divider()
             bottomBar
         }
@@ -156,8 +155,6 @@ struct EditorView: View {
             saveButton
             revertButton
             Spacer()
-            stripModePicker
-            Spacer()
             bypassToggle
             AppGearMenu()
         }
@@ -173,23 +170,10 @@ struct EditorView: View {
             saveButton
             revertButton
         }
-        ToolbarItem(placement: .principal) { stripModePicker }
         ToolbarItemGroup(placement: .primaryAction) {
             bypassToggle
             AppGearMenu()
         }
-    }
-
-    /// The editor's two ways of working: every filter, or the whole profile.
-    private var stripModePicker: some View {
-        Picker("Editing", selection: $stripMode) {
-            Text("Bands").tag(StripMode.bands)
-            Text("Adjust").tag(StripMode.adjust)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
-        .help("Bands edits each filter. Adjust tunes the whole profile with Bass, Treble, Tilt, and Strength.")
     }
 
     private var presetMenu: some View {
@@ -502,38 +486,44 @@ struct EditorView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Adjust pane
+    // MARK: - Adjust bar
 
-    /// The simple way to tune a profile: two shelves, a tilt, and how much of
-    /// the correction to apply, laid over the bands without touching them.
-    private var adjustPane: some View {
-        HStack(spacing: 24) {
-            VStack(spacing: 8) {
-                adjustRow("Bass", value: $state.preset.adjustment.bassDB, range: -6...6, step: 0.5,
-                          actionName: "Change Bass", format: Self.signedDecibels,
-                          help: "Low shelf at 105 Hz")
-                adjustRow("Treble", value: $state.preset.adjustment.trebleDB, range: -6...6, step: 0.5,
-                          actionName: "Change Treble", format: Self.signedDecibels,
-                          help: "High shelf at 2.5 kHz")
-                adjustRow("Tilt", value: $state.preset.adjustment.tiltDB, range: -6...6, step: 0.5,
-                          actionName: "Change Tilt", format: Self.signedDecibels,
-                          help: "Tips the whole response about 1 kHz: up brightens, down warms")
-                adjustRow("Strength", value: strengthPercent, range: 0...100, step: 5,
-                          actionName: "Change Strength", format: Self.strengthPercentage,
-                          help: "How much of the preset's correction is applied")
+    /// Tunes the whole profile without editing its bands: two shelves, a
+    /// tilt, and how much of the correction to apply. It sits under the band
+    /// list so the reason a curve leaves its handles is always on screen.
+    private var adjustBar: some View {
+        HStack(spacing: 12) {
+            Text("Adjust")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)
+            Grid(horizontalSpacing: 24, verticalSpacing: 6) {
+                GridRow {
+                    adjustRow("Bass", value: $state.preset.adjustment.bassDB, range: -6...6, step: 0.5,
+                              actionName: "Change Bass", format: Self.signedDecibels,
+                              help: "Low shelf at 105 Hz")
+                    adjustRow("Treble", value: $state.preset.adjustment.trebleDB, range: -6...6, step: 0.5,
+                              actionName: "Change Treble", format: Self.signedDecibels,
+                              help: "High shelf at 2.5 kHz")
+                }
+                GridRow {
+                    adjustRow("Tilt", value: $state.preset.adjustment.tiltDB, range: -6...6, step: 0.5,
+                              actionName: "Change Tilt", format: Self.signedDecibels,
+                              help: "Tips the whole response about 1 kHz: up brightens, down warms")
+                    adjustRow("Strength", value: strengthPercent, range: 0...100, step: 5,
+                              actionName: "Change Strength", format: Self.strengthPercentage,
+                              help: "How much of the preset's correction is applied")
+                }
             }
-            .frame(maxWidth: 520)
             Button("Reset") {
                 state.recordingUndo("Reset Adjustments", undoManager) { state.preset.adjustment = .neutral }
             }
             .disabled(state.preset.adjustment.isNeutral)
             .help("Back to the preset as published")
-            Spacer(minLength: 0)
         }
         .controlSize(.small)
         .padding(.horizontal, 24)
-        .padding(.vertical, 12)
-        .frame(height: Self.bandStripHeight)
+        .padding(.vertical, 8)
     }
 
     private var strengthPercent: Binding<Double> {
@@ -561,7 +551,7 @@ struct EditorView: View {
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .leading)
+                .frame(width: 56, alignment: .leading)
             Slider(
                 value: Binding(
                     get: { value.wrappedValue },
